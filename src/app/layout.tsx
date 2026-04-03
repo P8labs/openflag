@@ -58,10 +58,6 @@ export const metadata: Metadata = {
       "Know what you agree to. Simple breakdown of privacy policies.",
     images: ["/og.png"],
   },
-
-  icons: {
-    icon: "/favicon.ico",
-  },
 };
 
 export default function RootLayout({
