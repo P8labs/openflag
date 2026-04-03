@@ -13,6 +13,7 @@ class RunCols:
     ID = "id"
     SOFTWARE_ID = "software_id"
     STATUS = "status"
+    RETRY_COUNT = "retry_count"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
     STARTED_AT = "started_at"
@@ -85,12 +86,6 @@ class RunStatus:
     PROCESSING = "PROCESSING"
     DONE = "DONE"
     FAILED = "FAILED"
-
-
-class Verdict:
-    SAFE = "SAFE"
-    CAUTION = "CAUTION"
-    HIGH_RISK = "HIGH_RISK"
 
 
 @dataclass

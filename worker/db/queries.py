@@ -6,6 +6,7 @@ from db.client import Database
 from db.schema import (
     RunRow,
     SoftwareRow,
+    SoftwareStatus,
     Tables,
     RunCols,
     SoftwareCols,
@@ -43,9 +44,10 @@ class Queries:
 
                 FROM {run_table} r
                 JOIN {software_table} s
-                    ON s.{s_id} = r.{r_software_id}
+                ON s.{s_id} = r.{r_software_id}
 
-                WHERE r.{r_status} = 'PENDING'
+                WHERE r.{r_status} IN ('PENDING', 'FAILED')
+                AND r.{r_retry_count} < 3
                 ORDER BY r.{r_created_at} ASC
 
                 FOR UPDATE SKIP LOCKED
@@ -58,6 +60,7 @@ class Queries:
                 r_id=sql.Identifier(RunCols.ID),
                 r_software_id=sql.Identifier(RunCols.SOFTWARE_ID),
                 r_status=sql.Identifier(RunCols.STATUS),
+                r_retry_count=sql.Identifier(RunCols.RETRY_COUNT),
                 r_created_at=sql.Identifier(RunCols.CREATED_AT),
                 r_updated_at=sql.Identifier(RunCols.UPDATED_AT),
                 r_started_at=sql.Identifier(RunCols.STARTED_AT),
@@ -149,14 +152,17 @@ class Queries:
             cur.execute(
                 sql.SQL("""
                     UPDATE {run_table}
-                    SET {status} = 'FAILED',
+                    SET {status} = '{failed}',
                         {error} = %s,
+                        {retry_count} = {retry_count} + 1,
                         {finished_at} = NOW()
                     WHERE {id} = %s
                 """).format(
                     run_table=sql.Identifier(Tables.RUN),
                     status=sql.Identifier(RunCols.STATUS),
+                    failed=sql.Identifier(SoftwareStatus.FAILED),
                     error=sql.Identifier(RunCols.ERROR),
+                    retry_count=sql.Identifier(RunCols.RETRY_COUNT),
                     finished_at=sql.Identifier(RunCols.FINISHED_AT),
                     id=sql.Identifier(RunCols.ID),
                 ),
@@ -180,9 +186,11 @@ class Queries:
                         {feature_policies},
                         {best_practices},
                         {bad_practices},
-                        {reviewed}
+                        {reviewed},
+                        updated_at,
+                        created_at
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, false)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, false, NOW(), NOW())
 
                     ON CONFLICT ({software_id})
                     DO UPDATE SET
@@ -218,7 +226,7 @@ class Queries:
                 (
                     software_id,
                     final.quick_take,
-                    final.verdict.upper(),
+                    final.verdict,
                     final.risk_score,
                     final.flags.red,
                     final.flags.yellow,

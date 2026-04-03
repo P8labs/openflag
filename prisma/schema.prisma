@@ -44,14 +44,14 @@ enum SoftwareType {
 }
 
 model Analysis {
-  id String @id @default(cuid())
+  id Int @id @default(autoincrement())
 
   softwareId String   @unique @map("software_id")
   software   Software @relation(fields: [softwareId], references: [id])
 
-  quickTake String  @map("quick_take")
-  verdict   Verdict
-  riskScore Int     @map("risk_score")
+  quickTake String @map("quick_take")
+  verdict   String
+  riskScore Int    @map("risk_score")
 
   redFlags    String[] @map("red_flags")
   yellowFlags String[] @map("yellow_flags")
@@ -74,12 +74,6 @@ model Analysis {
   @@map("analysis")
 }
 
-enum Verdict {
-  SAFE
-  CAUTION
-  HIGH_RISK
-}
-
 model Run {
   id String @id @default(cuid())
 
@@ -95,6 +89,8 @@ model Run {
 
   logs  String?
   error String?
+
+  retryCount Int @default(0) @map("retry_count")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
