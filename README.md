@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OpenFlag
 
-## Getting Started
+openflag is simple idea
 
-First, run the development server:
+we all just click "i agree" without reading anything  
+privacy policy is long, boring and confusing  
+no one actually read that
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+so i made this
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## what it does
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+you search any software
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+it will show
 
-## Learn More
+- quick summary
+- what data they collect
+- where your data goes
+- red flags / green flags
+- important things you should know
 
-To learn more about Next.js, take a look at the following resources:
+so you dont need to read 50 pages legal text
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## how it works
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. take privacy policy + terms
+2. clean and process text
+3. run ai in steps
+4. generate structured output
+5. show in simple ui
 
-## Deploy on Vercel
+everything is not realtime  
+data is processed before and reviewed
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## features (current [TODO])
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- software search
+- simple clean UI
+- structured policy breakdown
+- flags (red, yellow, green)
+- verdict (safe / caution / risk)
+
+## coming next
+
+- compare softwares
+- open source alternatives
+- opt-out email generator
+- ai chat for policy questions
+
+## why i made this
+
+i dont like reading privacy policy  
+but also dont like being blind
+
+so this is middle solution
+
+## note
+
+this is not legal advice  
+just help you understand things better
+
+## tech
+
+- next.js (frontend)
+- python worker (pipeline)
+- postgres
+- qdrant (vector db)
+- openrouter (llm)
+
+## status
+
+work in progress but usable
