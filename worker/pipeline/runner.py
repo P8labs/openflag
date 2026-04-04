@@ -21,7 +21,7 @@ class PipelineRunner:
         self.stage3 = Stage3(run_id, self.llm)
         self.stage4 = Stage4(run_id)
 
-    def run(self, software: dict, force: bool = False):
+    def run(self, software: dict, force: bool = False, on_stage=None):
         self.logger.info("[PIPELINE] Starting")
 
         if not software or "urls" not in software:
@@ -59,12 +59,21 @@ class PipelineRunner:
         try:
             stage1 = self.stage1.execute(combined_text, force=force)
 
+            if on_stage:
+                on_stage("stage1", stage1.model_dump())
+
             if not stage1.main_points:
                 raise RuntimeError("Stage1 returned empty points")
 
             stage2 = self.stage2.execute(stage1.main_points, force=force)
 
+            if on_stage:
+                on_stage("stage2", stage2.model_dump())
+
             stage3 = self.stage3.execute(stage2.model_dump(), force=force)
+
+            if on_stage:
+                on_stage("stage3", stage3.model_dump())
 
             stage4 = self.stage4.execute(
                 {
@@ -74,6 +83,9 @@ class PipelineRunner:
                 },
                 force=force,
             )
+
+            if on_stage:
+                on_stage("final", stage4.model_dump())
 
         except Exception as e:
             self.logger.error(f"[PIPELINE] Stage failure [{e}]", exc_info=True)

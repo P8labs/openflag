@@ -18,6 +18,36 @@ class Queries:
     def __init__(self, db: Database):
         self.db = db
 
+    def save_run_stage(self, conn, run_id: str, stage_name: str, payload):
+        stage_columns = {
+            "stage1": RunCols.STAGE_1,
+            "stage2": RunCols.STAGE_2,
+            "stage3": RunCols.STAGE_3,
+            "final": RunCols.FINAL,
+        }
+
+        stage_column = stage_columns.get(stage_name)
+        if not stage_column:
+            raise ValueError(f"Unknown stage: {stage_name}")
+
+        with conn.cursor() as cur:
+            cur.execute(
+                sql.SQL("""
+                    UPDATE {run_table}
+                    SET {stage_column} = %s,
+                        {status} = 'PROCESSING',
+                        {updated_at} = NOW()
+                    WHERE {id} = %s
+                """).format(
+                    run_table=sql.Identifier(Tables.RUN),
+                    stage_column=sql.Identifier(stage_column),
+                    status=sql.Identifier(RunCols.STATUS),
+                    updated_at=sql.Identifier(RunCols.UPDATED_AT),
+                    id=sql.Identifier(RunCols.ID),
+                ),
+                (payload, run_id),
+            )
+
     def get_next_job(self, conn) -> Optional[Tuple[RunRow, SoftwareRow]]:
         with conn.cursor() as cur:
             query = sql.SQL("""

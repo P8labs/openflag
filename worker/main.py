@@ -39,11 +39,18 @@ class Worker:
 
                 runner = PipelineRunner(run.id)
 
+                def save_stage(stage_name, payload):
+                    with self.db.transaction() as stage_conn:
+                        self.queries.save_run_stage(
+                            stage_conn, run.id, stage_name, payload
+                        )
+
                 final = runner.run(
                     {
                         "name": software.name,
                         "urls": software.urls,
-                    }
+                    },
+                    on_stage=save_stage,
                 )
 
                 with self.db.transaction() as conn:
