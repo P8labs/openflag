@@ -1,59 +1,79 @@
-# OpenFlag
+# Openflag MVP
 
-openflag is tool for understand any codebase fast.
+Openflag is a developer + creator matching platform with a swipe-first experience.
 
-just paste github repo and it will show what is happening inside code.
+Core loop:
 
-## why this
+1. Discover cards (users and projects)
+2. Evaluate quickly in-place
+3. Swipe right/left
+4. Create matches
 
-when we open new repo it is very confusing  
-too many files  
-dont know where to start
+## Stack
 
-this tool try to solve this.
+- Next.js App Router + TypeScript
+- Tailwind CSS v4
+- HeroUI v3
+- Better Auth (GitHub OAuth)
+- Prisma + PostgreSQL
+- TanStack Query (infinite feed)
+- Framer Motion (swipe interactions)
 
-## what it do (mvp)
+## Local Setup
 
-- repo summary
-- detect stack (node, react, go, etc)
-- find entry point
-- show important dependencies
-- show basic program flow
-- group files by feature (like auth, api, db)
+1. Copy [.env.example](.env.example) to `.env` and fill in values.
+2. Install deps:
 
-## how it works (simple)
+```bash
+pnpm install
+```
 
-1. user give github repo
-2. system clone repo
-3. scan files
-4. detect patterns (no ai for most part)
-5. generate summary + structure
+3. Generate Prisma client and run migrations:
 
-## tech
+```bash
+pnpm prisma:generate
+pnpm prisma:migrate --name init
+```
 
-- go (worker + api)
-- postgres (store data)
-- redis (queue)
-- react (simple ui)
+4. Run development server:
 
-## current status
+```bash
+pnpm dev
+```
 
-building... not ready
+## Auth + Onboarding
 
-## goal
+- GitHub is the only sign-in provider.
+- First authenticated page load triggers GitHub profile/repo sync.
+- Only meaningful profile data is persisted:
+  - username, avatar, bio
+  - derived skills (from languages + topics)
+  - top repositories only
 
-understand any codebase in few seconds  
-no need to read 100 files
+## Matching Rules
 
-## future
+- `RIGHT` swipe on user creates interest.
+- User-user match is created when both users swipe `RIGHT`.
+- `RIGHT` swipe on project creates interest and auto-accepts in MVP.
+- Swipes are stored with unique constraints for idempotency.
 
-- better flow detection
-- ask questions on repo
-- github login
-- caching with commits
+## Feed
 
-## note
+- Infinite card stack UI (not list-based).
+- Mixed user/project cards from one feed endpoint.
+- Cursor-based pagination.
+- Relevance scoring based on:
+  - skill overlap
+  - interest overlap
+  - recent activity bonus
 
-this is early project  
-things can break  
-logic not perfect
+## Quality Constraints
+
+- Profile completion required before swiping.
+- Daily swipe limit on API.
+- Session swipe limit on client.
+
+## Manifesto Mode
+
+Set `OPENFLAG_MANIFESTO_MODE=true` to replace the swipe app with the manifesto landing page.
+In production, this mode keeps only the main manifesto page available and hides the product flow.

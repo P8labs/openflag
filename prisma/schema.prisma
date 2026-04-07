@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions    Session[]
+  accounts    Account[]
+  profileMeta ProfileMeta?
+  projects    Project[]    @relation("ProjectOwner")
+
+  swipesGiven    Swipe[] @relation("Swiper")
+  swipesReceived Swipe[] @relation("TargetUserSwipes")
+
+  matchesAsA        Match[] @relation("MatchUserA")
+  matchesAsB        Match[] @relation("MatchUserB")
+  projectInterests  Match[] @relation("InterestedUser")
+  ownedProjectMatch Match[] @relation("ProjectOwnerMatch")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ProfileMeta {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  username           String   @unique
+  avatar             String?
+  bio                String?
+  skills             String[] @default([])
+  interests          String[] @default([])
+  topRepositories    Json?
+  availability       String?
+  onboardingComplete Boolean  @default(false)
+  recentActivityAt   DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([recentActivityAt])
+}
+
+model Project {
+  id               String   @id @default(cuid())
+  ownerId          String
+  title            String
+  description      String
+  requiredRoles    String[] @default([])
+  tags             String[] @default([])
+  isActive         Boolean  @default(true)
+  recentActivityAt DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  owner   User    @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  swipes  Swipe[] @relation("TargetProjectSwipes")
+  matches Match[]
+
+  @@index([ownerId])
+  @@index([recentActivityAt])
+}
+
+model Swipe {
+  id              String         @id @default(cuid())
+  swiperId        String
+  targetUserId    String?
+  targetProjectId String?
+  direction       SwipeDirection
+  createdAt       DateTime       @default(now())
+
+  swiper        User     @relation("Swiper", fields: [swiperId], references: [id], onDelete: Cascade)
+  targetUser    User?    @relation("TargetUserSwipes", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetProject Project? @relation("TargetProjectSwipes", fields: [targetProjectId], references: [id], onDelete: Cascade)
+
+  @@unique([swiperId, targetUserId])
+  @@unique([swiperId, targetProjectId])
+  @@index([swiperId, createdAt])
+  @@index([targetUserId, direction])
+  @@index([targetProjectId, direction])
+}
+
+model Match {
+  id               String      @id @default(cuid())
+  type             MatchType
+  status           MatchStatus @default(ACTIVE)
+  userAId          String?
+  userBId          String?
+  interestedUserId String?
+  projectId        String?
+  projectOwnerId   String?
+  createdAt        DateTime    @default(now())
+
+  userA          User?    @relation("MatchUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB          User?    @relation("MatchUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  interestedUser User?    @relation("InterestedUser", fields: [interestedUserId], references: [id], onDelete: Cascade)
+  project        Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectOwner   User?    @relation("ProjectOwnerMatch", fields: [projectOwnerId], references: [id], onDelete: Cascade)
+
+  @@unique([type, userAId, userBId])
+  @@unique([type, interestedUserId, projectId])
+  @@index([userAId])
+  @@index([userBId])
+  @@index([interestedUserId])
+  @@index([projectOwnerId])
+  @@index([status, createdAt])
+}
+
+enum SwipeDirection {
+  LEFT
+  RIGHT
+}
+
+enum MatchType {
+  USER_USER
+  USER_PROJECT
+}
+
+enum MatchStatus {
+  ACTIVE
+  PENDING_OWNER
+}
