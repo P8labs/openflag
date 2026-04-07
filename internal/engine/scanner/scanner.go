@@ -8,45 +8,60 @@ import (
 	"strings"
 )
 
-func ScanRepo(root string) error {
+type ScanSummary struct {
+	RepoRoot       string
+	Files          int
+	Languages      int
+	Frameworks     []string
+	GraphGenerated bool
+	Graph          GraphMetrics
+}
+
+func ScanRepo(root string) (ScanSummary, error) {
+	summary := ScanSummary{RepoRoot: root}
 
 	files, err := filterFiles(root)
 	if err != nil {
-		return err
+		return summary, err
 	}
+	summary.Files = len(files)
 
 	fmt.Println("Total Files Detected: ", len(files))
 
 	sortedFiles, err := GroupSameLanguageFiles(files)
 	if err != nil {
-		return err
+		return summary, err
 	}
+	summary.Languages = len(sortedFiles)
 
 	fmt.Println("Languages Detected: ", len(sortedFiles))
 
 	frameworks, err := DetermineFrameworks(files)
 	if err != nil {
-		return err
+		return summary, err
 	}
+	summary.Frameworks = frameworks
 
 	fmt.Println("Frameworks: ", frameworks)
 
 	if len(frameworks) == 0 {
 		fmt.Println("No frameworks detected, scanning for function signatures and headers...")
-		return nil
+		return summary, nil
 	}
 
 	if contains(frameworks[0], "next") || contains(frameworks[0], "react") || contains(frameworks[0], "vue") || contains(frameworks[0], "angular") || contains(frameworks[0], "express") || contains(frameworks[0], "tailwind") || contains(frameworks[0], "bootstrap") {
 
 		fmt.Println("Scanning for function signatures and headers in .ts, .js, .jsx, .tsx files...")
-		_, err := extractFunctions(sortedFiles)
+		graph, err := extractFunctions(root, frameworks, sortedFiles)
 		if err != nil {
-			return err
+			return summary, err
 		}
+		summary.GraphGenerated = true
+		summary.Graph = graph.Metadata
 
 	}
 
-	return nil
+	return summary, nil
 
 }
 

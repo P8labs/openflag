@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenFlag Dev Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+      :root {
+        --bg: #f4f6f8;
+        --card: #ffffff;
+        --ink: #182431;
+        --muted: #4f6577;
+        --line: #d8e0e7;
+        --accent: #0f766e;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 0% 0%, #dbeafe, transparent 38%), var(--bg);
+      }
+      header {
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--line);
+        background: #fff;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .title {
+        margin: 0;
+        font-size: 22px;
+      }
+      .sub {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        gap: 16px;
+        padding: 16px;
+      }
+      @media (max-width: 980px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .card {
+        border: 1px solid var(--line);
+        background: var(--card);
+        border-radius: 14px;
+        padding: 14px;
+        box-shadow: 0 6px 18px rgba(24, 36, 49, 0.06);
+      }
+      h2 {
+        margin: 0 0 10px;
+        font-size: 15px;
+      }
+      ul {
+        margin: 8px 0;
+        padding-left: 18px;
+      }
+      li {
+        margin: 4px 0;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .chip {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 12px;
+        background: #f8fafc;
+      }
+      .mono {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        padding: 6px;
+      }
+      .viewer {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        background: #fff;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      button {
+        border: 1px solid #a6bac7;
+        background: #fff;
+        border-radius: 8px;
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      a {
+        color: #0f4c81;
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1 class="title">OpenFlag Dev Graph Viewer</h1>
+      <p class="sub">
+        Temporary dev UI for high-level architecture, entrypoint flows, and
+        feature maps that are easier to understand than raw edge graphs.
+      </p>
+    </header>
+
+    <main class="grid">
+      <section class="card">
+        <h2>Run Summary</h2>
+        <div id="meta" class="mono">loading...</div>
+
+        <h2>Feature Domains</h2>
+        <div id="features" class="chips"></div>
+
+        <h2>Entrypoints</h2>
+        <ul id="entries"></ul>
+
+        <h2>Exitpoints</h2>
+        <ul id="exits"></ul>
+      </section>
+
+      <section class="card">
+        <h2>Graph Visualizer</h2>
+        <div class="actions" id="graphActions"></div>
+        <div id="diagram" class="viewer"></div>
+
+        <h2>Recent Runs</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Repo</th>
+              <th>Status</th>
+              <th>Edges</th>
+              <th>Scanned At</th>
+            </tr>
+          </thead>
+          <tbody id="runs"></tbody>
+        </table>
+
+        <h2>Feature Summary</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Files</th>
+              <th>Functions</th>
+              <th>Deps</th>
+            </tr>
+          </thead>
+          <tbody id="files"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script>
+      mermaid.initialize({ startOnLoad: false, securityLevel: "loose" });
+
+      const diagram = document.getElementById("diagram");
+      const graphActions = document.getElementById("graphActions");
+
+      async function getJSON(path) {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error(path + " failed");
+        return res.json();
+      }
+
+      async function getText(path) {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error(path + " failed");
+        return res.text();
+      }
+
+      function appendList(id, items) {
+        const el = document.getElementById(id);
+        el.innerHTML = "";
+        items.forEach((x) => {
+          const li = document.createElement("li");
+          li.textContent = x;
+          el.appendChild(li);
+        });
+      }
+
+      function setMermaid(markup) {
+        diagram.innerHTML =
+          '<pre class="mermaid">' + markup.replace(/</g, "&lt;") + "</pre>";
+        mermaid.run({ querySelector: ".mermaid" });
+      }
+
+      async function safeRender(path) {
+        try {
+          setMermaid(await getText(path));
+        } catch (e) {
+          diagram.textContent = "Render failed for " + path + ": " + e.message;
+        }
+      }
+
+      function addAction(label, onClick) {
+        const btn = document.createElement("button");
+        btn.textContent = label;
+        btn.onclick = onClick;
+        graphActions.appendChild(btn);
+      }
+
+      async function load() {
+        try {
+          const [summary, mapModel, runs] = await Promise.all([
+            getJSON("/api/summary"),
+            getJSON("/api/map"),
+            getJSON("/api/runs"),
+          ]);
+
+          const overview =
+            mapModel && mapModel.overview
+              ? mapModel.overview
+              : summary.metadata;
+          document.getElementById("meta").textContent = JSON.stringify(
+            overview,
+            null,
+            2,
+          );
+
+          const features = document.getElementById("features");
+          features.innerHTML = "";
+          const featureList = Array.isArray(mapModel.features)
+            ? mapModel.features.map((f) => f.name)
+            : Array.isArray(summary.features)
+              ? summary.features
+              : [];
+          featureList.slice(0, 25).forEach((f) => {
+            const c = document.createElement("span");
+            c.className = "chip mono";
+            c.textContent = f;
+            features.appendChild(c);
+          });
+
+          const entryList = Array.isArray(mapModel.entryFlows)
+            ? mapModel.entryFlows.map((x) => x.entrypoint)
+            : Array.isArray(summary.entries)
+              ? summary.entries
+              : [];
+          const exitList = Array.isArray(mapModel.entryFlows)
+            ? mapModel.entryFlows.map((x) => x.exit || "(no explicit exit)")
+            : Array.isArray(summary.exits)
+              ? summary.exits
+              : [];
+          appendList("entries", entryList);
+          appendList("exits", exitList);
+
+          const fileRows = document.getElementById("files");
+          fileRows.innerHTML = "";
+          const safeFeatures = Array.isArray(mapModel.features)
+            ? mapModel.features
+            : [];
+          safeFeatures.slice(0, 80).forEach((f) => {
+            const deps = Array.isArray(f.dependencies)
+              ? f.dependencies.length
+              : 0;
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td class="mono">${f.name || ""}</td><td>${f.fileCount || 0}</td><td>${f.functionCount || 0}</td><td>${deps}</td>`;
+            fileRows.appendChild(tr);
+          });
+
+          const runRows = document.getElementById("runs");
+          runRows.innerHTML = "";
+          runs.forEach((r) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${r.id}</td><td class="mono">${r.repoUrl}</td><td>${r.status}</td><td>${r.graphEdges}</td><td>${r.scannedAt}</td>`;
+            runRows.appendChild(tr);
+          });
+
+          addAction("Architecture", async () =>
+            safeRender("/artifacts/architecture_map.mmd"),
+          );
+          addAction("Entrypoint Flows", async () =>
+            safeRender("/artifacts/entry_flow_map.mmd"),
+          );
+          addAction("Feature Dependencies", async () =>
+            safeRender("/artifacts/feature_map.mmd"),
+          );
+          addAction("Open Markdown Map", async () => {
+            const md = await getText("/artifacts/codebase_map.md");
+            diagram.textContent = md;
+          });
+
+          diagram.textContent =
+            "Select Architecture, Entrypoint Flows, or Feature Dependencies to visualize the codebase map.";
+        } catch (e) {
+          diagram.textContent = "Error: " + e.message;
+        }
+      }
+
+      load();
+    </script>
+  </body>
+</html>
