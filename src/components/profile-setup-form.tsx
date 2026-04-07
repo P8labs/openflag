@@ -26,19 +26,24 @@ export function ProfileSetupForm({
   const [message, setMessage] = useState<string | null>(null);
 
   return (
-    <Card className="mx-auto mt-8 w-full max-w-2xl gap-4 p-6" variant="default">
-      <Card.Header className="space-y-1">
-        <Card.Title>Finish Profile To Start Swiping</Card.Title>
-        <Card.Description>
+    <Card
+      className="mx-auto mt-8 w-full max-w-2xl rounded-xs border border-black/5 bg-white/80 p-6 shadow-[0_1px_2px_rgba(0,0,0,0.02)] dark:border-white/10 dark:bg-white/5"
+      variant="default"
+    >
+      <Card.Header className="space-y-2">
+        <Card.Title className="text-xl font-medium tracking-tight sm:text-2xl">
+          Finish profile to start swiping
+        </Card.Title>
+        <Card.Description className="max-w-2xl text-sm text-muted">
           Your GitHub data is imported automatically. Add intent and
           availability so matches are useful.
         </Card.Description>
       </Card.Header>
-      <Card.Content className="grid gap-4">
+      <Card.Content className="grid gap-4 pt-2">
         <label className="grid gap-2 text-sm text-muted">
           Bio
           <textarea
-            className="min-h-24 rounded-xl border border-divider bg-content1 p-3 text-sm text-foreground"
+            className="min-h-24 rounded-xs border border-black/10 bg-transparent p-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted/80 focus:border-black/20 dark:border-white/10 dark:focus:border-white/20"
             value={bio}
             onChange={(event) => setBio(event.target.value)}
             placeholder="What kind of collaboration are you looking for?"
@@ -47,7 +52,7 @@ export function ProfileSetupForm({
         <label className="grid gap-2 text-sm text-muted">
           Skills
           <input
-            className="rounded-xl border border-divider bg-content1 p-3 text-sm text-foreground"
+            className="rounded-xs border border-black/10 bg-transparent p-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted/80 focus:border-black/20 dark:border-white/10 dark:focus:border-white/20"
             value={skillsText}
             onChange={(event) => setSkillsText(event.target.value)}
             placeholder="Comma separated: TypeScript, UI Design, Rust"
@@ -56,7 +61,7 @@ export function ProfileSetupForm({
         <label className="grid gap-2 text-sm text-muted">
           Interests
           <input
-            className="rounded-xl border border-divider bg-content1 p-3 text-sm text-foreground"
+            className="rounded-xs border border-black/10 bg-transparent p-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted/80 focus:border-black/20 dark:border-white/10 dark:focus:border-white/20"
             value={interestsText}
             onChange={(event) => setInterestsText(event.target.value)}
             placeholder="Comma separated: AI tools, SaaS, Open source"
@@ -65,18 +70,19 @@ export function ProfileSetupForm({
         <label className="grid gap-2 text-sm text-muted">
           Availability
           <input
-            className="rounded-xl border border-divider bg-content1 p-3 text-sm text-foreground"
+            className="rounded-xs border border-black/10 bg-transparent p-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted/80 focus:border-black/20 dark:border-white/10 dark:focus:border-white/20"
             value={availability}
             onChange={(event) => setAvailability(event.target.value)}
             placeholder="Example: 8 hrs/week evenings"
           />
         </label>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4 pt-2">
           <p className="text-sm text-muted">
             Swiping unlocks once this profile is complete.
           </p>
           <Button
-            variant="primary"
+            className="rounded-xs"
+            variant="outline"
             isDisabled={isSaving}
             onPress={async () => {
               setIsSaving(true);

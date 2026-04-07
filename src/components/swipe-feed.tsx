@@ -1,13 +1,15 @@
 "use client";
 
-import { Avatar, Button, Card, Chip, Spinner } from "@heroui/react";
+import { Avatar, Button, Card, Chip, Modal, Spinner } from "@heroui/react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { motion, PanInfo, useAnimation } from "framer-motion";
+import { motion, type PanInfo, useAnimation } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 
 import type { FeedItem } from "@/lib/feed";
 
 const SESSION_SWIPE_LIMIT = 25;
+const SWIPE_THRESHOLD = 96;
+const SWIPE_VELOCITY = 420;
 
 type FeedResponse = {
   items: FeedItem[];
@@ -20,12 +22,11 @@ type SwipeResult = {
   remaining: number;
 };
 
-const SWIPE_THRESHOLD = 110;
-const SWIPE_VELOCITY = 460;
+const cardSurfaceClassName =
+  "rounded-xs border border-black/5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] dark:border-white/10 dark:bg-white/5";
 
 export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
   const [sessionSwipeCount, setSessionSwipeCount] = useState(0);
-  const [detailOpen, setDetailOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [latestMatchId, setLatestMatchId] = useState<string | null>(null);
 
@@ -34,10 +35,10 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
   const feedQuery = useInfiniteQuery({
     queryKey: ["feed"],
     queryFn: async ({ pageParam }) => {
-      const value = pageParam
+      const suffix = pageParam
         ? `?cursor=${encodeURIComponent(pageParam as string)}`
         : "";
-      const response = await fetch(`/api/feed${value}`);
+      const response = await fetch(`/api/feed${suffix}`);
       if (!response.ok) {
         throw new Error("Unable to load feed.");
       }
@@ -91,11 +92,7 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
   }, [current, feedQuery]);
 
   async function registerSwipe(direction: "LEFT" | "RIGHT") {
-    if (!current) {
-      return;
-    }
-
-    if (sessionSwipeCount >= SESSION_SWIPE_LIMIT) {
+    if (!current || sessionSwipeCount >= SESSION_SWIPE_LIMIT) {
       return;
     }
 
@@ -119,14 +116,13 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
 
     setSessionSwipeCount((count) => count + 1);
     setActiveIndex((index) => index + 1);
-    setDetailOpen(false);
 
     if (result.matched && result.matchId) {
       setLatestMatchId(result.matchId);
       await matchesQuery.refetch();
     }
 
-    if (activeIndex + 5 >= allItems.length && feedQuery.hasNextPage) {
+    if (activeIndex + 4 >= allItems.length && feedQuery.hasNextPage) {
       void feedQuery.fetchNextPage();
     }
   }
@@ -139,46 +135,53 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
     const velocity = info.velocity.x;
 
     if (horizontal > SWIPE_THRESHOLD || velocity > SWIPE_VELOCITY) {
-      await controls.start({ x: 440, opacity: 0, rotate: 12 });
+      await controls.start({
+        x: 320,
+        opacity: 0,
+        rotate: 6,
+        transition: { duration: 0.2, ease: [0.2, 0, 0.2, 1] },
+      });
       controls.set({ x: 0, opacity: 1, rotate: 0 });
       await registerSwipe("RIGHT");
       return;
     }
 
     if (horizontal < -SWIPE_THRESHOLD || velocity < -SWIPE_VELOCITY) {
-      await controls.start({ x: -440, opacity: 0, rotate: -12 });
+      await controls.start({
+        x: -320,
+        opacity: 0,
+        rotate: -6,
+        transition: { duration: 0.2, ease: [0.2, 0, 0.2, 1] },
+      });
       controls.set({ x: 0, opacity: 1, rotate: 0 });
       await registerSwipe("LEFT");
       return;
     }
 
-    await controls.start({ x: 0, rotate: 0 });
+    await controls.start({
+      x: 0,
+      rotate: 0,
+      transition: { duration: 0.18, ease: [0.2, 0, 0.2, 1] },
+    });
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 pb-12">
-      <div className="flex items-center justify-between rounded-2xl border border-divider bg-content1 px-4 py-3">
-        <p className="text-sm text-muted">
-          Session swipes: {sessionSwipeCount}/{SESSION_SWIPE_LIMIT}
+    <section className="w-full">
+      <div className="flex items-center justify-between px-1 pb-3 text-xs text-muted">
+        <p>
+          Queue {Math.min(activeIndex + 1, Math.max(allItems.length, 1))}/
+          {Math.max(allItems.length, 1)}
         </p>
-        <div className="flex items-center gap-2">
-          <Chip size="sm" variant="soft">
-            {matchesQuery.data?.matches.length ?? 0} matches
-          </Chip>
-          <Chip size="sm" variant="soft">
-            Infinite feed
-          </Chip>
-        </div>
+        <p>
+          {matchesQuery.data?.matches.length ?? 0} matches · {sessionSwipeCount}
+          /{SESSION_SWIPE_LIMIT}
+        </p>
       </div>
 
-      <div className="relative h-135 w-full">
+      <div className="relative min-h-[520px] w-full">
         {next ? (
-          <div className="absolute inset-0 scale-[0.98] rounded-3xl opacity-80">
-            <FeedCard
-              item={next}
-              detailOpen={false}
-              onToggleDetail={() => undefined}
-            />
+          <div className="pointer-events-none absolute inset-0 translate-y-1 scale-[0.985] opacity-70">
+            <FeedCard item={next} current={false} />
           </div>
         ) : null}
 
@@ -187,37 +190,42 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
             animate={controls}
             className="absolute inset-0"
             drag="x"
-            dragElastic={0.14}
+            dragElastic={0.12}
+            transition={{ duration: 0.2, ease: [0.2, 0, 0.2, 1] }}
             onDragEnd={onDragEnd}
+            whileHover={{ scale: 1.012, y: -1 }}
           >
-            <FeedCard
-              item={current}
-              detailOpen={detailOpen}
-              onToggleDetail={() => setDetailOpen((value) => !value)}
-            />
+            <FeedCard item={current} current />
           </motion.div>
         ) : (
           <Card
-            className="flex h-full items-center justify-center p-6"
-            variant="secondary"
+            className={`${cardSurfaceClassName} flex min-h-[520px] items-center justify-center p-6`}
+            variant="default"
           >
             <Card.Content className="items-center gap-3 text-center">
               {feedQuery.isFetching ? <Spinner /> : null}
-              <p className="text-lg font-medium">No more cards right now.</p>
-              <p className="text-sm text-muted">
-                Come back later for fresh collaborators and projects.
+              <p className="text-sm font-medium">No more cards right now.</p>
+              <p className="max-w-sm text-sm text-muted">
+                Come back later for a fresh queue of collaborators and projects.
               </p>
             </Card.Content>
           </Card>
         )}
       </div>
 
-      <div className="flex items-center justify-center gap-3">
+      <div className="mt-4 flex items-center justify-center gap-2">
         <Button
-          variant="danger-soft"
+          className="rounded-xs"
+          size="sm"
+          variant="ghost"
           isDisabled={!current || sessionSwipeCount >= SESSION_SWIPE_LIMIT}
           onPress={async () => {
-            await controls.start({ x: -420, opacity: 0, rotate: -11 });
+            await controls.start({
+              x: -280,
+              opacity: 0,
+              rotate: -5,
+              transition: { duration: 0.18, ease: [0.2, 0, 0.2, 1] },
+            });
             controls.set({ x: 0, opacity: 1, rotate: 0 });
             await registerSwipe("LEFT");
           }}
@@ -225,10 +233,17 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
           Skip
         </Button>
         <Button
-          variant="primary"
+          className="rounded-xs"
+          size="sm"
+          variant="outline"
           isDisabled={!current || sessionSwipeCount >= SESSION_SWIPE_LIMIT}
           onPress={async () => {
-            await controls.start({ x: 420, opacity: 0, rotate: 11 });
+            await controls.start({
+              x: 280,
+              opacity: 0,
+              rotate: 5,
+              transition: { duration: 0.18, ease: [0.2, 0, 0.2, 1] },
+            });
             controls.set({ x: 0, opacity: 1, rotate: 0 });
             await registerSwipe("RIGHT");
           }}
@@ -237,143 +252,207 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
         </Button>
       </div>
 
-      <Card className="p-4" variant="transparent">
-        <Card.Header>
-          <Card.Title>Matched</Card.Title>
-          <Card.Description>
-            Placeholder panel for upcoming messaging. The MVP validates
-            discovery and matching only.
-          </Card.Description>
-        </Card.Header>
-        <Card.Content className="gap-2">
-          {matchesQuery.data?.matches.slice(0, 5).map((match) => (
+      <div className={`${cardSurfaceClassName} mt-4 p-4`}>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-muted">
+              Matches
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              Simple match placeholder for future messaging.
+            </p>
+          </div>
+          {latestMatchId ? (
+            <p className="text-xs text-muted">Latest: {latestMatchId}</p>
+          ) : null}
+        </div>
+
+        <div className="mt-3 space-y-2">
+          {matchesQuery.data?.matches.slice(0, 3).map((match) => (
             <div
               key={match.id}
-              className="rounded-xl border border-divider p-3 text-sm"
+              className="rounded-xs border border-black/5 px-3 py-2 text-sm text-foreground/90 dark:border-white/10"
             >
               {match.type === "USER_USER"
-                ? `User match: ${match.userA?.name ?? "Unknown"} ↔ ${match.userB?.name ?? "Unknown"}`
-                : `Project match: ${match.project?.title ?? "Project"} with ${match.interestedUser?.name ?? "User"}`}
+                ? `${match.userA?.name ?? "Unknown"} ↔ ${match.userB?.name ?? "Unknown"}`
+                : `${match.project?.title ?? "Project"} with ${match.interestedUser?.name ?? "User"}`}
             </div>
           ))}
           {!matchesQuery.data?.matches.length ? (
             <p className="text-sm text-muted">No matches yet. Keep swiping.</p>
           ) : null}
-          {latestMatchId ? (
-            <p className="text-xs text-muted">
-              Latest match ID: {latestMatchId}
-            </p>
-          ) : null}
-        </Card.Content>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
-function FeedCard({
-  item,
-  detailOpen,
-  onToggleDetail,
-}: {
-  item: FeedItem;
-  detailOpen: boolean;
-  onToggleDetail: () => void;
-}) {
-  const common = (
-    <div className="flex flex-wrap gap-2">
-      {item.type === "user"
-        ? item.skills.slice(0, detailOpen ? 12 : 6).map((skill) => (
-            <Chip key={skill} size="sm" variant="primary">
-              {skill}
-            </Chip>
-          ))
-        : item.requiredRoles.slice(0, detailOpen ? 12 : 6).map((role) => (
-            <Chip key={role} size="sm" variant="primary">
-              {role}
-            </Chip>
-          ))}
-    </div>
-  );
+function FeedCard({ item, current }: { item: FeedItem; current: boolean }) {
+  const primaryTags = item.type === "user" ? item.skills : item.requiredRoles;
+  const secondaryTags = item.type === "user" ? item.interests : item.tags;
 
   return (
-    <Card className="h-full gap-4 p-4 sm:p-6" variant="default">
-      <Card.Header className="justify-between">
-        <div className="flex items-center gap-3">
-          {item.type === "user" ? (
-            <Avatar className="size-12">
-              <Avatar.Image alt={item.name} src={item.avatar ?? undefined} />
-              <Avatar.Fallback>
-                {item.name.slice(0, 2).toUpperCase()}
-              </Avatar.Fallback>
-            </Avatar>
-          ) : (
-            <Avatar className="size-12">
-              <Avatar.Image
-                alt={item.owner.name}
-                src={item.owner.avatar ?? undefined}
-              />
-              <Avatar.Fallback>
-                {item.owner.name.slice(0, 2).toUpperCase()}
-              </Avatar.Fallback>
-            </Avatar>
-          )}
-          <div>
-            <Card.Title>
-              {item.type === "user" ? item.name : item.title}
-            </Card.Title>
-            <Card.Description>
+    <Card
+      className={`${cardSurfaceClassName} h-full overflow-hidden p-4 sm:p-5`}
+      variant="default"
+    >
+      <div className="flex h-full flex-col gap-4">
+        <div className="flex items-start gap-3">
+          <Avatar className="size-11 rounded-xs">
+            <Avatar.Image
+              alt={item.type === "user" ? item.name : item.title}
+              src={
+                item.type === "user"
+                  ? (item.avatar ?? undefined)
+                  : (item.owner.avatar ?? undefined)
+              }
+            />
+            <Avatar.Fallback>
+              {(item.type === "user" ? item.name : item.title)
+                .slice(0, 2)
+                .toUpperCase()}
+            </Avatar.Fallback>
+          </Avatar>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-base font-medium tracking-tight text-foreground">
+                  {item.type === "user" ? item.name : item.title}
+                </p>
+                <p className="mt-0.5 truncate text-sm text-muted">
+                  {item.type === "user"
+                    ? `@${item.username}`
+                    : `Project by @${item.owner.username}`}
+                </p>
+              </div>
+              <Chip size="sm" variant="soft">
+                {item.type === "user" ? "Person" : "Project"}
+              </Chip>
+            </div>
+
+            <p className="mt-3 line-clamp-1 text-sm text-muted">
               {item.type === "user"
-                ? `@${item.username}`
-                : `By @${item.owner.username}`}
-            </Card.Description>
+                ? (item.bio ?? "No bio yet.")
+                : item.description}
+            </p>
           </div>
         </div>
-        <Chip size="sm" variant="secondary">
-          Score {item.score}
-        </Chip>
-      </Card.Header>
 
-      <Card.Content className="gap-4 overflow-auto">
-        <p className="text-sm text-foreground/90">
-          {item.type === "user"
-            ? (item.bio ?? "No bio yet.")
-            : item.description}
-        </p>
+        <div className="flex flex-wrap gap-2">
+          {primaryTags.slice(0, 5).map((tag) => (
+            <Chip key={tag} size="sm" variant="secondary">
+              {tag}
+            </Chip>
+          ))}
+        </div>
 
-        {common}
+        <div className="flex flex-wrap gap-2">
+          {secondaryTags.slice(0, 3).map((tag) => (
+            <Chip key={tag} size="sm" variant="soft">
+              {tag}
+            </Chip>
+          ))}
+        </div>
 
-        {item.type === "project" ? (
-          <div className="flex flex-wrap gap-2">
-            {item.tags.slice(0, detailOpen ? 12 : 6).map((tag) => (
-              <Chip key={tag} size="sm" variant="soft">
-                {tag}
-              </Chip>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {item.interests.slice(0, detailOpen ? 12 : 6).map((interest) => (
-              <Chip key={interest} size="sm" variant="soft">
-                {interest}
-              </Chip>
-            ))}
-          </div>
-        )}
-
-        {detailOpen ? (
-          <div className="rounded-xl border border-divider p-3 text-sm text-muted">
-            {item.type === "user"
-              ? "Expanded details include broader skill and interest context for a faster yes/no decision."
-              : "Expanded details include roles and tags to evaluate fit without leaving the swipe loop."}
-          </div>
-        ) : null}
-      </Card.Content>
-
-      <Card.Footer>
-        <Button size="sm" variant="ghost" onPress={onToggleDetail}>
-          {detailOpen ? "Collapse" : "Expand details"}
-        </Button>
-      </Card.Footer>
+        <div className="mt-auto flex items-center justify-between gap-3 pt-1">
+          <DetailModal
+            item={item}
+            triggerLabel={current ? "Details" : "More"}
+          />
+          <span className="text-xs text-muted">
+            {item.type === "user" ? "Skills and intent" : "Roles and fit"}
+          </span>
+        </div>
+      </div>
     </Card>
+  );
+}
+
+function DetailModal({
+  item,
+  triggerLabel,
+}: {
+  item: FeedItem;
+  triggerLabel: string;
+}) {
+  return (
+    <Modal>
+      <Button className="rounded-xs" size="sm" variant="ghost">
+        {triggerLabel}
+      </Button>
+      <Modal.Backdrop variant="blur">
+        <Modal.Container>
+          <Modal.Dialog
+            className={`${cardSurfaceClassName} max-w-[560px] overflow-hidden p-0`}
+          >
+            <Modal.CloseTrigger />
+            <Modal.Header className="border-b border-black/5 px-5 py-4 dark:border-white/10">
+              <div>
+                <Modal.Heading className="text-lg font-medium tracking-tight">
+                  {item.type === "user" ? item.name : item.title}
+                </Modal.Heading>
+                <p className="mt-1 text-sm text-muted">
+                  {item.type === "user"
+                    ? `@${item.username}`
+                    : `Project by @${item.owner.username}`}
+                </p>
+              </div>
+            </Modal.Header>
+            <Modal.Body className="px-5 py-4">
+              <div className="space-y-4">
+                <p className="text-sm text-foreground/90">
+                  {item.type === "user"
+                    ? (item.bio ?? "No bio yet.")
+                    : item.description}
+                </p>
+
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                    Primary
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(item.type === "user"
+                      ? item.skills
+                      : item.requiredRoles
+                    ).map((tag) => (
+                      <Chip key={tag} size="sm" variant="secondary">
+                        {tag}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                    Context
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(item.type === "user" ? item.interests : item.tags).map(
+                      (tag) => (
+                        <Chip key={tag} size="sm" variant="soft">
+                          {tag}
+                        </Chip>
+                      ),
+                    )}
+                  </div>
+                </div>
+
+                {item.type === "project" ? (
+                  <p className="text-sm text-muted">
+                    Owner: {item.owner.name} · @{item.owner.username}
+                  </p>
+                ) : null}
+              </div>
+            </Modal.Body>
+            <Modal.Footer className="border-t border-black/5 px-5 py-4 dark:border-white/10">
+              <Button slot="close" className="rounded-xs" variant="outline">
+                Close
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
   );
 }

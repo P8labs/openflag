@@ -1,45 +1,48 @@
-import { Card, Chip, Link } from "@heroui/react";
+import { Chip, Link } from "@heroui/react";
 
 export function ManifestoPage() {
   return (
-    <main className="min-h-screen px-4 py-10 sm:px-8 lg:px-12">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <header className="flex flex-col gap-4 rounded-[2rem] border border-divider bg-content1/80 p-6 backdrop-blur sm:p-10">
+    <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
+        <header className="space-y-6 rounded-xs border border-black/5 bg-white/70 p-6 shadow-[0_1px_2px_rgba(0,0,0,0.02)] backdrop-blur dark:border-white/10 dark:bg-white/5 sm:p-8">
           <div className="flex flex-wrap items-center gap-2">
-            <Chip size="sm" variant="primary">
+            <Chip size="sm" variant="secondary">
               Openflag manifesto
             </Chip>
             <Chip size="sm" variant="soft">
               Swipe-first collaboration
             </Chip>
           </div>
-          <div className="max-w-3xl space-y-4">
-            <h1 className="text-4xl font-semibold tracking-tight sm:text-6xl">
+          <div className="max-w-2xl space-y-3">
+            <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
               Fast discovery for builders who want to ship together.
             </h1>
-            <p className="max-w-2xl text-base text-muted sm:text-lg">
+            <p className="max-w-2xl text-sm text-muted sm:text-base">
               Openflag is not a feed. It is a decision engine for collaborators
               and projects. You log in, your profile assembles itself from
               GitHub, and you start swiping within seconds.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             <Link
-              className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+              className="inline-flex h-9 items-center justify-center rounded-xs border border-black/10 px-3 text-xs font-medium text-foreground transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+              href="#principles"
+            >
+              Principles
+            </Link>
+            <Link
+              className="inline-flex h-9 items-center justify-center rounded-xs border border-black/10 px-3 text-xs font-medium text-foreground transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
               href="/roadmap"
             >
               Roadmap
             </Link>
-            <Link
-              className="inline-flex h-10 items-center justify-center rounded-full border border-divider px-4 text-sm font-medium text-foreground transition-colors hover:bg-content2"
-              href="/"
-            >
-              Manifesto
-            </Link>
           </div>
         </header>
 
-        <section className="grid gap-4 lg:grid-cols-3">
+        <section
+          id="principles"
+          className="grid gap-0 divide-y divide-black/5 rounded-xs border border-black/5 bg-white/70 shadow-[0_1px_2px_rgba(0,0,0,0.02)] dark:divide-white/10 dark:border-white/10 dark:bg-white/5"
+        >
           {[
             {
               title: "Discover",
@@ -54,12 +57,10 @@ export function ManifestoPage() {
               body: "Mutual interest becomes a match. For projects, owner approval closes the loop.",
             },
           ].map((item) => (
-            <Card key={item.title} className="p-5" variant="default">
-              <Card.Header className="space-y-1">
-                <Card.Title>{item.title}</Card.Title>
-                <Card.Description>{item.body}</Card.Description>
-              </Card.Header>
-            </Card>
+            <div key={item.title} className="p-5 sm:p-6">
+              <p className="text-sm font-medium tracking-tight">{item.title}</p>
+              <p className="mt-2 max-w-xl text-sm text-muted">{item.body}</p>
+            </div>
           ))}
         </section>
       </div>

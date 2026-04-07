@@ -1,4 +1,4 @@
-import { Card, Chip } from "@heroui/react";
+import { Chip } from "@heroui/react";
 
 const roadmapItems = [
   {
@@ -20,30 +20,32 @@ const roadmapItems = [
 
 export function RoadmapPage() {
   return (
-    <main className="min-h-screen px-4 py-10 sm:px-8 lg:px-12">
-      <div className="mx-auto w-full max-w-5xl space-y-6">
-        <header className="space-y-3">
-          <Chip size="sm" variant="soft">
+    <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-4xl space-y-6">
+        <header className="space-y-3 rounded-xs border border-black/5 bg-white/70 p-6 shadow-[0_1px_2px_rgba(0,0,0,0.02)] dark:border-white/10 dark:bg-white/5 sm:p-8">
+          <Chip size="sm" variant="secondary">
             Roadmap
           </Chip>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
             What ships next.
           </h1>
-          <p className="max-w-2xl text-muted">
+          <p className="max-w-2xl text-sm text-muted sm:text-base">
             Keep the product narrow: discovery, intent, and matching. Everything
             else is deferred until the swipe loop is proven.
           </p>
         </header>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="divide-y divide-black/5 rounded-xs border border-black/5 bg-white/70 shadow-[0_1px_2px_rgba(0,0,0,0.02)] dark:divide-white/10 dark:border-white/10 dark:bg-white/5">
           {roadmapItems.map((item) => (
-            <Card key={item.title} className="p-5" variant="default">
-              <Card.Header className="space-y-1">
-                <Card.Description>{item.phase}</Card.Description>
-                <Card.Title>{item.title}</Card.Title>
-                <Card.Description>{item.body}</Card.Description>
-              </Card.Header>
-            </Card>
+            <div key={item.title} className="p-5 sm:p-6">
+              <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                {item.phase}
+              </p>
+              <p className="mt-2 text-sm font-medium tracking-tight">
+                {item.title}
+              </p>
+              <p className="mt-2 max-w-2xl text-sm text-muted">{item.body}</p>
+            </div>
           ))}
         </div>
       </div>
