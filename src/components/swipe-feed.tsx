@@ -5,11 +5,16 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { motion, type PanInfo, useAnimation } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 
+import { MobileNav } from "@/components/mobile-nav";
+import { ProjectMedia } from "@/components/project-media";
 import type { FeedItem } from "@/lib/feed";
 
 const SESSION_SWIPE_LIMIT = 25;
-const SWIPE_THRESHOLD = 96;
-const SWIPE_VELOCITY = 420;
+const SWIPE_THRESHOLD = 88;
+const SWIPE_VELOCITY = 520;
+const SWIPE_POWER_FACTOR = 0.2;
+const SWIPE_COMMIT_SCORE = 150;
+const FEED_TABS = ["All", "Projects", "People", "Open Source"];
 
 type FeedResponse = {
   items: FeedItem[];
@@ -22,13 +27,12 @@ type SwipeResult = {
   remaining: number;
 };
 
-const cardSurfaceClassName =
-  "rounded-xs border border-black/5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] dark:border-white/10 dark:bg-white/5";
-
 export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
   const [sessionSwipeCount, setSessionSwipeCount] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [latestMatchId, setLatestMatchId] = useState<string | null>(null);
+  const [expandedItem, setExpandedItem] = useState<FeedItem | null>(null);
+  const [activeTab, setActiveTab] = useState("All");
+  const [dragOffsetX, setDragOffsetX] = useState(0);
 
   const controls = useAnimation();
 
@@ -82,8 +86,32 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
     [feedQuery.data],
   );
 
-  const current = allItems[activeIndex] ?? null;
-  const next = allItems[activeIndex + 1] ?? null;
+  const filteredItems = useMemo(() => {
+    if (activeTab === "All") {
+      return allItems;
+    }
+
+    if (activeTab === "Projects") {
+      return allItems.filter((item) => item.type === "project");
+    }
+
+    if (activeTab === "People") {
+      return allItems.filter((item) => item.type === "user");
+    }
+
+    return allItems.filter((item) =>
+      item.type === "project"
+        ? item.tags.some((tag) =>
+            ["open-source", "oss", "open source"].includes(tag.toLowerCase()),
+          )
+        : item.interests.some((tag) =>
+            ["open-source", "oss", "open source"].includes(tag.toLowerCase()),
+          ),
+    );
+  }, [allItems, activeTab]);
+
+  const current = filteredItems[activeIndex] ?? null;
+  const next = filteredItems[activeIndex + 1] ?? null;
 
   useEffect(() => {
     if (!current && feedQuery.hasNextPage && !feedQuery.isFetchingNextPage) {
@@ -118,11 +146,10 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
     setActiveIndex((index) => index + 1);
 
     if (result.matched && result.matchId) {
-      setLatestMatchId(result.matchId);
       await matchesQuery.refetch();
     }
 
-    if (activeIndex + 4 >= allItems.length && feedQuery.hasNextPage) {
+    if (activeIndex + 4 >= filteredItems.length && feedQuery.hasNextPage) {
       void feedQuery.fetchNextPage();
     }
   }
@@ -134,26 +161,39 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
     const horizontal = info.offset.x;
     const velocity = info.velocity.x;
 
-    if (horizontal > SWIPE_THRESHOLD || velocity > SWIPE_VELOCITY) {
+    const swipeScore =
+      Math.abs(horizontal) + Math.abs(velocity) * SWIPE_POWER_FACTOR;
+
+    if (
+      horizontal > SWIPE_THRESHOLD ||
+      velocity > SWIPE_VELOCITY ||
+      (horizontal > 0 && swipeScore > SWIPE_COMMIT_SCORE)
+    ) {
       await controls.start({
-        x: 320,
+        x: 380,
         opacity: 0,
-        rotate: 6,
-        transition: { duration: 0.2, ease: [0.2, 0, 0.2, 1] },
+        rotate: 11,
+        transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] },
       });
-      controls.set({ x: 0, opacity: 1, rotate: 0 });
+      controls.set({ x: 0, y: 0, opacity: 1, rotate: 0 });
+      setDragOffsetX(0);
       await registerSwipe("RIGHT");
       return;
     }
 
-    if (horizontal < -SWIPE_THRESHOLD || velocity < -SWIPE_VELOCITY) {
+    if (
+      horizontal < -SWIPE_THRESHOLD ||
+      velocity < -SWIPE_VELOCITY ||
+      (horizontal < 0 && swipeScore > SWIPE_COMMIT_SCORE)
+    ) {
       await controls.start({
-        x: -320,
+        x: -380,
         opacity: 0,
-        rotate: -6,
-        transition: { duration: 0.2, ease: [0.2, 0, 0.2, 1] },
+        rotate: -11,
+        transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] },
       });
-      controls.set({ x: 0, opacity: 1, rotate: 0 });
+      controls.set({ x: 0, y: 0, opacity: 1, rotate: 0 });
+      setDragOffsetX(0);
       await registerSwipe("LEFT");
       return;
     }
@@ -161,26 +201,49 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
     await controls.start({
       x: 0,
       rotate: 0,
-      transition: { duration: 0.18, ease: [0.2, 0, 0.2, 1] },
+      transition: { type: "spring", stiffness: 420, damping: 32, mass: 0.7 },
     });
+    setDragOffsetX(0);
   }
 
   return (
-    <section className="w-full">
-      <div className="flex items-center justify-between px-1 pb-3 text-xs text-muted">
-        <p>
-          Queue {Math.min(activeIndex + 1, Math.max(allItems.length, 1))}/
-          {Math.max(allItems.length, 1)}
-        </p>
-        <p>
-          {matchesQuery.data?.matches.length ?? 0} matches · {sessionSwipeCount}
-          /{SESSION_SWIPE_LIMIT}
-        </p>
+    <section className="relative flex h-[100dvh] w-full max-w-md flex-col overflow-hidden px-4 pb-24 pt-5 text-white sm:max-w-lg">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.1),transparent_38%),linear-gradient(180deg,#121722_0%,#090c12_100%)]" />
+
+      <div>
+        <div className="flex items-center justify-between text-sm text-white/90">
+          <p className="font-semibold tracking-tight">Openflag</p>
+          <p className="text-xs text-white/60">
+            {matchesQuery.data?.matches.length ?? 0} matches
+          </p>
+        </div>
+
+        <h2 className="mt-1 text-4xl font-semibold tracking-tight">For You</h2>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {FEED_TABS.map((tab) => (
+            <button
+              key={tab}
+              className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                tab === activeTab
+                  ? "border-white/30 bg-white/20 font-medium text-white"
+                  : "border-transparent bg-white/5 text-white/60 hover:bg-white/10"
+              }`}
+              type="button"
+              onClick={() => {
+                setActiveTab(tab);
+                setActiveIndex(0);
+              }}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="relative min-h-[520px] w-full">
+      <div className="relative mt-4 flex-1">
         {next ? (
-          <div className="pointer-events-none absolute inset-0 translate-y-1 scale-[0.985] opacity-70">
+          <div className="pointer-events-none absolute inset-0 translate-y-3 scale-[0.98] opacity-65">
             <FeedCard item={next} current={false} />
           </div>
         ) : null}
@@ -190,22 +253,52 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
             animate={controls}
             className="absolute inset-0"
             drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.12}
-            transition={{ duration: 0.2, ease: [0.2, 0, 0.2, 1] }}
+            transition={{
+              type: "spring",
+              stiffness: 420,
+              damping: 32,
+              mass: 0.7,
+            }}
+            onDrag={(_, info) => setDragOffsetX(info.offset.x)}
             onDragEnd={onDragEnd}
-            whileHover={{ scale: 1.012, y: -1 }}
+            style={{ rotate: dragOffsetX * 0.04 }}
+            whileTap={{ scale: 0.995 }}
           >
-            <FeedCard item={current} current />
+            <motion.div
+              className="pointer-events-none absolute left-4 top-4 z-20 rounded-full border border-emerald-300 bg-emerald-500/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-emerald-200"
+              style={{
+                opacity: Math.max(0, Math.min((dragOffsetX - 18) / 75, 1)),
+              }}
+            >
+              Like
+            </motion.div>
+            <motion.div
+              className="pointer-events-none absolute right-4 top-4 z-20 rounded-full border border-rose-300 bg-rose-500/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-rose-200"
+              style={{
+                opacity: Math.max(0, Math.min((-dragOffsetX - 18) / 75, 1)),
+              }}
+            >
+              Nope
+            </motion.div>
+            <FeedCard
+              item={current}
+              current
+              onOpenDetails={() => setExpandedItem(current)}
+            />
           </motion.div>
         ) : (
           <Card
-            className={`${cardSurfaceClassName} flex min-h-[520px] items-center justify-center p-6`}
+            className="flex h-full items-center justify-center rounded-[30px] border border-white/10 bg-[#131922] p-6"
             variant="default"
           >
             <Card.Content className="items-center gap-3 text-center">
               {feedQuery.isFetching ? <Spinner /> : null}
-              <p className="text-sm font-medium">No more cards right now.</p>
-              <p className="max-w-sm text-sm text-muted">
+              <p className="text-sm font-medium text-white">
+                No more cards right now.
+              </p>
+              <p className="max-w-sm text-sm text-white/65">
                 Come back later for a fresh queue of collaborators and projects.
               </p>
             </Card.Content>
@@ -213,10 +306,19 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-center gap-2">
+      <div className="mt-4 flex items-center justify-between text-xs text-white/55">
+        <span>
+          Queue {Math.min(activeIndex + 1, Math.max(filteredItems.length, 1))}/
+          {Math.max(filteredItems.length, 1)}
+        </span>
+        <span>
+          {sessionSwipeCount}/{SESSION_SWIPE_LIMIT} swipes
+        </span>
+      </div>
+
+      <div className="mt-3 flex items-center justify-center gap-4">
         <Button
-          className="rounded-xs"
-          size="sm"
+          className="size-14 rounded-full border border-white/20 bg-[#1b222f] text-white hover:bg-[#252f42]"
           variant="ghost"
           isDisabled={!current || sessionSwipeCount >= SESSION_SWIPE_LIMIT}
           onPress={async () => {
@@ -230,11 +332,10 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
             await registerSwipe("LEFT");
           }}
         >
-          Skip
+          X
         </Button>
         <Button
-          className="rounded-xs"
-          size="sm"
+          className="size-14 rounded-full bg-white text-black hover:bg-white/90"
           variant="outline"
           isDisabled={!current || sessionSwipeCount >= SESSION_SWIPE_LIMIT}
           onPress={async () => {
@@ -248,57 +349,118 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
             await registerSwipe("RIGHT");
           }}
         >
-          Interested
+          <span className="text-lg leading-none">♥</span>
+        </Button>
+        <Button
+          className="size-14 rounded-full border border-white/20 bg-[#1b222f] text-white hover:bg-[#252f42]"
+          variant="ghost"
+          isDisabled={!current}
+          onPress={() => setExpandedItem(current)}
+        >
+          i
         </Button>
       </div>
 
-      <div className={`${cardSurfaceClassName} mt-4 p-4`}>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-muted">
-              Matches
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              Simple match placeholder for future messaging.
-            </p>
-          </div>
-          {latestMatchId ? (
-            <p className="text-xs text-muted">Latest: {latestMatchId}</p>
-          ) : null}
-        </div>
+      <MobileNav />
 
-        <div className="mt-3 space-y-2">
-          {matchesQuery.data?.matches.slice(0, 3).map((match) => (
-            <div
-              key={match.id}
-              className="rounded-xs border border-black/5 px-3 py-2 text-sm text-foreground/90 dark:border-white/10"
-            >
-              {match.type === "USER_USER"
-                ? `${match.userA?.name ?? "Unknown"} ↔ ${match.userB?.name ?? "Unknown"}`
-                : `${match.project?.title ?? "Project"} with ${match.interestedUser?.name ?? "User"}`}
-            </div>
-          ))}
-          {!matchesQuery.data?.matches.length ? (
-            <p className="text-sm text-muted">No matches yet. Keep swiping.</p>
-          ) : null}
-        </div>
-      </div>
+      <DetailModal
+        isOpen={Boolean(expandedItem)}
+        item={expandedItem}
+        onOpenChange={(open) => {
+          if (!open) {
+            setExpandedItem(null);
+          }
+        }}
+      />
     </section>
   );
 }
 
-function FeedCard({ item, current }: { item: FeedItem; current: boolean }) {
+function FeedCard({
+  item,
+  current,
+  onOpenDetails,
+}: {
+  item: FeedItem;
+  current: boolean;
+  onOpenDetails?: () => void;
+}) {
   const primaryTags = item.type === "user" ? item.skills : item.requiredRoles;
   const secondaryTags = item.type === "user" ? item.interests : item.tags;
+  const isProjectWithMedia =
+    item.type === "project" && Boolean(item.image || item.video);
 
   return (
     <Card
-      className={`${cardSurfaceClassName} h-full overflow-hidden p-4 sm:p-5`}
+      className="h-full overflow-hidden rounded-[30px] border border-white/10 bg-[#151b25] p-3"
       variant="default"
     >
-      <div className="flex h-full flex-col gap-4">
-        <div className="flex items-start gap-3">
-          <Avatar className="size-11 rounded-xs">
+      <div className="flex h-full flex-col gap-3">
+        {item.type === "project" ? (
+          isProjectWithMedia ? (
+            <ProjectMedia
+              className="h-[48%] min-h-55 w-full"
+              image={item.image}
+              title={item.title}
+              video={item.video}
+            />
+          ) : (
+            <div className="relative min-h-55 rounded-[20px] bg-gradient-to-br from-indigo-300 via-cyan-200 to-emerald-200 p-4 text-black/80">
+              <div className="absolute inset-0 rounded-[20px] bg-[radial-gradient(circle_at_18%_20%,rgba(255,255,255,0.55),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(255,255,255,0.25),transparent_48%)]" />
+              <div className="relative flex h-full flex-col justify-between rounded-[16px] border border-black/10 bg-black/10 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full border border-black/20 bg-black/10 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]">
+                    No media
+                  </span>
+                  <span className="text-xs">
+                    Score {Math.round(item.score)}
+                  </span>
+                </div>
+                <p className="line-clamp-3 text-sm font-semibold">
+                  {item.description}
+                </p>
+                <p className="text-xs opacity-80">
+                  Roles {item.requiredRoles.length} · Tags {item.tags.length}
+                </p>
+              </div>
+            </div>
+          )
+        ) : (
+          <div className="relative min-h-55 rounded-[20px] bg-linear-to-br from-sky-300 via-cyan-200 to-emerald-200 p-4 text-black/80">
+            <div className="absolute inset-0 rounded-[20px] bg-[radial-gradient(circle_at_18%_20%,rgba(255,255,255,0.55),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(255,255,255,0.25),transparent_48%)]" />
+            <div className="relative flex h-full flex-col justify-between rounded-[16px] border border-black/10 bg-black/10 p-3">
+              <div className="flex items-center gap-3">
+                <Avatar className="size-11 rounded-full border border-black/15 bg-white/80">
+                  <Avatar.Image
+                    alt={item.name}
+                    src={item.avatar ?? undefined}
+                  />
+                  <Avatar.Fallback>
+                    {item.name.slice(0, 2).toUpperCase()}
+                  </Avatar.Fallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{item.name}</p>
+                  <p className="truncate text-xs opacity-75">
+                    @{item.username}
+                  </p>
+                </div>
+              </div>
+
+              <p className="line-clamp-3 text-sm font-medium">
+                {item.bio ??
+                  "Builder looking for collaborators and meaningful projects."}
+              </p>
+
+              <p className="text-xs opacity-80">
+                Skills {item.skills.length} · Interests {item.interests.length}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-start gap-3 px-1 pb-1">
+          <Avatar className="size-10 rounded-full">
             <Avatar.Image
               alt={item.type === "user" ? item.name : item.title}
               src={
@@ -317,51 +479,81 @@ function FeedCard({ item, current }: { item: FeedItem; current: boolean }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate text-base font-medium tracking-tight text-foreground">
+                <p className="truncate text-base font-semibold tracking-tight text-white">
                   {item.type === "user" ? item.name : item.title}
                 </p>
-                <p className="mt-0.5 truncate text-sm text-muted">
+                <p className="mt-0.5 truncate text-xs text-white/60">
                   {item.type === "user"
                     ? `@${item.username}`
                     : `Project by @${item.owner.username}`}
                 </p>
               </div>
-              <Chip size="sm" variant="soft">
+              <Chip size="sm" variant="soft" className="bg-white/10 text-white">
                 {item.type === "user" ? "Person" : "Project"}
               </Chip>
             </div>
 
-            <p className="mt-3 line-clamp-1 text-sm text-muted">
+            <p className="mt-2 line-clamp-2 text-sm text-white/70">
               {item.type === "user"
                 ? (item.bio ?? "No bio yet.")
                 : item.description}
             </p>
+
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Chip
+                size="sm"
+                variant="secondary"
+                className="bg-white/10 text-white/80"
+              >
+                Score {Math.round(item.score)}
+              </Chip>
+              <Chip
+                size="sm"
+                variant="secondary"
+                className="bg-white/10 text-white/80"
+              >
+                Active {formatRecency(item.recentActivityAt)}
+              </Chip>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {primaryTags.slice(0, 5).map((tag) => (
-            <Chip key={tag} size="sm" variant="secondary">
+        <div className="flex flex-wrap gap-2 px-1">
+          {primaryTags.slice(0, 4).map((tag) => (
+            <Chip
+              key={tag}
+              size="sm"
+              variant="secondary"
+              className="bg-white/10 text-white/80"
+            >
               {tag}
             </Chip>
           ))}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {secondaryTags.slice(0, 3).map((tag) => (
-            <Chip key={tag} size="sm" variant="soft">
+          {secondaryTags.slice(0, 2).map((tag) => (
+            <Chip
+              key={tag}
+              size="sm"
+              variant="soft"
+              className="bg-white/8 text-white/70"
+            >
               {tag}
             </Chip>
           ))}
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-3 pt-1">
-          <DetailModal
-            item={item}
-            triggerLabel={current ? "Details" : "More"}
-          />
-          <span className="text-xs text-muted">
-            {item.type === "user" ? "Skills and intent" : "Roles and fit"}
+          <Button
+            className="rounded-full bg-white/10 text-white hover:bg-white/20"
+            size="sm"
+            variant="ghost"
+            onPress={onOpenDetails}
+          >
+            {current ? "Details" : "More"}
+          </Button>
+          <span className="text-xs text-white/55">
+            {item.type === "user"
+              ? `${item.skills.length} skills · ${item.interests.length} interests`
+              : `${item.requiredRoles.length} roles · ${item.tags.length} tags`}
           </span>
         </div>
       </div>
@@ -369,30 +561,52 @@ function FeedCard({ item, current }: { item: FeedItem; current: boolean }) {
   );
 }
 
+function formatRecency(value: string) {
+  const time = new Date(value).getTime();
+  if (!Number.isFinite(time)) {
+    return "recently";
+  }
+
+  const deltaHours = Math.max(1, Math.floor((Date.now() - time) / 3_600_000));
+
+  if (deltaHours < 24) {
+    return `${deltaHours}h`;
+  }
+
+  const deltaDays = Math.floor(deltaHours / 24);
+  if (deltaDays < 7) {
+    return `${deltaDays}d`;
+  }
+
+  const deltaWeeks = Math.floor(deltaDays / 7);
+  return `${deltaWeeks}w`;
+}
+
 function DetailModal({
+  isOpen,
   item,
-  triggerLabel,
+  onOpenChange,
 }: {
-  item: FeedItem;
-  triggerLabel: string;
+  isOpen: boolean;
+  item: FeedItem | null;
+  onOpenChange: (isOpen: boolean) => void;
 }) {
+  if (!item) {
+    return null;
+  }
+
   return (
-    <Modal>
-      <Button className="rounded-xs" size="sm" variant="ghost">
-        {triggerLabel}
-      </Button>
+    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
       <Modal.Backdrop variant="blur">
         <Modal.Container>
-          <Modal.Dialog
-            className={`${cardSurfaceClassName} max-w-[560px] overflow-hidden p-0`}
-          >
+          <Modal.Dialog className="max-w-140 overflow-hidden rounded-[26px] border border-white/10 bg-[#111722] p-0 text-white">
             <Modal.CloseTrigger />
-            <Modal.Header className="border-b border-black/5 px-5 py-4 dark:border-white/10">
+            <Modal.Header className="border-b border-white/10 px-5 py-4">
               <div>
                 <Modal.Heading className="text-lg font-medium tracking-tight">
                   {item.type === "user" ? item.name : item.title}
                 </Modal.Heading>
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-1 text-sm text-white/65">
                   {item.type === "user"
                     ? `@${item.username}`
                     : `Project by @${item.owner.username}`}
@@ -401,14 +615,23 @@ function DetailModal({
             </Modal.Header>
             <Modal.Body className="px-5 py-4">
               <div className="space-y-4">
-                <p className="text-sm text-foreground/90">
+                {item.type === "project" ? (
+                  <ProjectMedia
+                    className="h-52 w-full"
+                    image={item.image}
+                    title={item.title}
+                    video={item.video}
+                  />
+                ) : null}
+
+                <p className="text-sm text-white/80">
                   {item.type === "user"
                     ? (item.bio ?? "No bio yet.")
                     : item.description}
                 </p>
 
                 <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/55">
                     Primary
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -416,7 +639,12 @@ function DetailModal({
                       ? item.skills
                       : item.requiredRoles
                     ).map((tag) => (
-                      <Chip key={tag} size="sm" variant="secondary">
+                      <Chip
+                        key={tag}
+                        size="sm"
+                        variant="secondary"
+                        className="bg-white/10 text-white/80"
+                      >
                         {tag}
                       </Chip>
                     ))}
@@ -424,29 +652,32 @@ function DetailModal({
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/55">
                     Context
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {(item.type === "user" ? item.interests : item.tags).map(
                       (tag) => (
-                        <Chip key={tag} size="sm" variant="soft">
+                        <Chip
+                          key={tag}
+                          size="sm"
+                          variant="soft"
+                          className="bg-white/10 text-white/80"
+                        >
                           {tag}
                         </Chip>
                       ),
                     )}
                   </div>
                 </div>
-
-                {item.type === "project" ? (
-                  <p className="text-sm text-muted">
-                    Owner: {item.owner.name} · @{item.owner.username}
-                  </p>
-                ) : null}
               </div>
             </Modal.Body>
-            <Modal.Footer className="border-t border-black/5 px-5 py-4 dark:border-white/10">
-              <Button slot="close" className="rounded-xs" variant="outline">
+            <Modal.Footer className="border-t border-white/10 px-5 py-4">
+              <Button
+                slot="close"
+                className="rounded-full bg-white text-black"
+                variant="outline"
+              >
                 Close
               </Button>
             </Modal.Footer>

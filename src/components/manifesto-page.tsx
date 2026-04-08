@@ -4,7 +4,7 @@ export function ManifestoPage() {
   return (
     <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
-        <header className="space-y-6 rounded-xs border border-black/5 bg-white/70 p-6 shadow-[0_1px_2px_rgba(0,0,0,0.02)] backdrop-blur dark:border-white/10 dark:bg-white/5 sm:p-8">
+        <header className="space-y-6 rounded-xs p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2">
             <Chip size="sm" variant="secondary">
               Openflag manifesto
@@ -25,13 +25,13 @@ export function ManifestoPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
-              className="inline-flex h-9 items-center justify-center rounded-xs border border-black/10 px-3 text-xs font-medium text-foreground transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+              className="no-underline inline-flex h-9 items-center justify-center rounded-xs border px-3 text-xs font-medium text-foreground transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
               href="#principles"
             >
               Principles
             </Link>
             <Link
-              className="inline-flex h-9 items-center justify-center rounded-xs border border-black/10 px-3 text-xs font-medium text-foreground transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+              className="no-underline inline-flex h-9 items-center justify-center rounded-xs border px-3 text-xs font-medium text-foreground transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
               href="/roadmap"
             >
               Roadmap
@@ -41,7 +41,7 @@ export function ManifestoPage() {
 
         <section
           id="principles"
-          className="grid gap-0 divide-y divide-black/5 rounded-xs border border-black/5 bg-white/70 shadow-[0_1px_2px_rgba(0,0,0,0.02)] dark:divide-white/10 dark:border-white/10 dark:bg-white/5"
+          className="grid gap-0 divide-y  divide-black/5 rounded-xs border border-black/5 bg-white/70 shadow-[0_1px_2px_rgba(0,0,0,0.02)] dark:divide-white/10 dark:border-white/10 dark:bg-white/5"
         >
           {[
             {

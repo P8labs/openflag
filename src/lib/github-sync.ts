@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "@/generated/prisma";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -115,6 +115,74 @@ async function fetchGithubData(accessToken: string) {
   const repositories = (await reposResponse.json()) as GitHubRepository[];
 
   return { profile, repositories };
+}
+
+function parseRepositoryFullName(fullName: string) {
+  const [owner, name, ...rest] = fullName
+    .trim()
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (!owner || !name || rest.length > 0) {
+    return null;
+  }
+
+  return { owner, name };
+}
+
+export async function starRepositoryForUser({
+  userId,
+  repositoryFullName,
+  useHeaderFallback,
+}: {
+  userId: string;
+  repositoryFullName: string;
+  useHeaderFallback?: Headers;
+}) {
+  const parsedRepository = parseRepositoryFullName(repositoryFullName);
+
+  if (!parsedRepository) {
+    return { starred: false, reason: "invalid_repository" as const };
+  }
+
+  const accessTokenResult = await auth.api.getAccessToken({
+    body: {
+      providerId: "github",
+      userId,
+    },
+    headers: useHeaderFallback,
+  });
+
+  if (!accessTokenResult?.accessToken) {
+    return { starred: false, reason: "missing_access_token" as const };
+  }
+
+  const response = await fetch(
+    `https://api.github.com/user/starred/${encodeURIComponent(parsedRepository.owner)}/${encodeURIComponent(parsedRepository.name)}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessTokenResult.accessToken}`,
+        Accept: "application/vnd.github+json",
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (response.status === 204) {
+    return { starred: true as const };
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    return { starred: false, reason: "missing_scope_or_unauthorized" as const };
+  }
+
+  if (response.status === 404) {
+    return { starred: false, reason: "repository_not_found" as const };
+  }
+
+  return { starred: false, reason: "github_request_failed" as const };
 }
 
 export async function syncGithubOnboarding({

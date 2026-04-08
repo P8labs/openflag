@@ -25,6 +25,8 @@ export type FeedItem =
       score: number;
       projectId: string;
       title: string;
+      image: string | null;
+      video: string | null;
       description: string;
       requiredRoles: string[];
       tags: string[];
@@ -188,6 +190,8 @@ export async function getFeedPage({
         id: project.id,
         projectId: project.id,
         title: project.title,
+        image: project.image,
+        video: project.video,
         description: project.description,
         requiredRoles: project.requiredRoles,
         tags: project.tags,

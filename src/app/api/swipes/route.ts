@@ -1,6 +1,7 @@
-import { MatchType, SwipeDirection } from "@prisma/client";
+import { MatchType, SwipeDirection } from "@/generated/prisma";
 import { NextResponse } from "next/server";
 
+import { starRepositoryForUser } from "@/lib/github-sync";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
     targetType: "user" | "project";
     targetId: string;
     direction: "LEFT" | "RIGHT";
+    repositoryFullName?: string;
   };
 
   if (
@@ -87,6 +89,7 @@ export async function POST(request: Request) {
 
   let matched = false;
   let matchId: string | null = null;
+  let starredRepository = false;
 
   if (direction === SwipeDirection.RIGHT && targetUserId) {
     const reciprocal = await prisma.swipe.findUnique({
@@ -152,11 +155,21 @@ export async function POST(request: Request) {
       matched = true;
       matchId = match.id;
     }
+
+    if (body.repositoryFullName) {
+      const starResult = await starRepositoryForUser({
+        userId: session.user.id,
+        repositoryFullName: body.repositoryFullName,
+      });
+
+      starredRepository = starResult.starred;
+    }
   }
 
   return NextResponse.json({
     matched,
     matchId,
+    starredRepository,
     remaining: DAILY_SWIPE_LIMIT - (swipeCountToday + 1),
   });
 }

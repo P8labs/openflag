@@ -35,7 +35,13 @@ pnpm prisma:generate
 pnpm prisma:migrate --name init
 ```
 
-4. Run development server:
+4. Seed demo data for the feed and match views:
+
+```bash
+pnpm prisma:seed
+```
+
+5. Run development server:
 
 ```bash
 pnpm dev

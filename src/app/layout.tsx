@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { isManifestoMode } from "@/lib/site-mode";
+import { ManifestoPage } from "@/components/manifesto-page";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,8 +30,8 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-[#FAFAFA] text-[#111111] dark:bg-[#0E0E0E] dark:text-[#F5F5F5]">
-        <Providers>{children}</Providers>
+      <body className="min-h-full">
+        <Providers>{isManifestoMode ? <ManifestoPage /> : children}</Providers>
       </body>
     </html>
   );
