@@ -1,11 +1,9 @@
 import { notFound } from "next/navigation";
 
-import { Avatar } from "@heroui/react";
-
 import { ProjectMedia } from "@/components/project-media";
-import { UiCard } from "@/components/ui/card";
 import { UiPill } from "@/components/ui/pill";
 import { prisma } from "@/lib/prisma";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default async function PublicProfilePage({
   params,
@@ -45,15 +43,11 @@ export default async function PublicProfilePage({
             </div>
 
             <div className="flex items-center gap-4">
-              <Avatar size="lg">
-                <Avatar.Image
-                  alt={profile.user.name}
-                  src={profile.avatar ?? undefined}
-                />
-                <Avatar.Fallback>
-                  {profile.user.name.slice(0, 2).toUpperCase()}
-                </Avatar.Fallback>
-              </Avatar>
+              <img
+                alt={profile.user.name}
+                className="size-14 rounded-xs object-cover"
+                src={profile.avatar ?? ""}
+              />
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-muted">
                   @{profile.username}
@@ -75,8 +69,8 @@ export default async function PublicProfilePage({
             </div>
           </div>
 
-          <UiCard>
-            <UiCard.Content className="space-y-4 p-0">
+          <Card>
+            <CardContent className="space-y-4 p-0">
               <div>
                 <p className="text-sm font-medium">Signals</p>
                 <p className="mt-1 text-sm text-muted">
@@ -105,8 +99,8 @@ export default async function PublicProfilePage({
                   </p>
                 </div>
               </div>
-            </UiCard.Content>
-          </UiCard>
+            </CardContent>
+          </Card>
         </section>
 
         <section className="space-y-4">

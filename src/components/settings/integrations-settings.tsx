@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 
-import { UiButton } from "@/components/ui/button";
-import { UiInput } from "@/components/ui/field";
 import { UiPill } from "@/components/ui/pill";
 import { authClient } from "@/lib/auth-client";
 import { apiFetch } from "@/lib/api";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 
 type Props = {
   githubConnected: boolean;
@@ -47,9 +47,9 @@ export function IntegrationsSettings({
 
         <div className="mt-4 flex flex-wrap gap-2">
           {!githubOn ? (
-            <UiButton
-              isDisabled={busy !== null}
-              onPress={async () => {
+            <Button
+              disabled={busy !== null}
+              onClick={async () => {
                 setBusy("github");
                 await authClient.signIn.social({
                   provider: "github",
@@ -58,11 +58,11 @@ export function IntegrationsSettings({
               }}
             >
               Connect GitHub
-            </UiButton>
+            </Button>
           ) : (
-            <UiButton
-              isDisabled={busy !== null}
-              onPress={async () => {
+            <Button
+              disabled={busy !== null}
+              onClick={async () => {
                 setBusy("github");
                 setMessage(null);
 
@@ -89,7 +89,7 @@ export function IntegrationsSettings({
               }}
             >
               Sync GitHub
-            </UiButton>
+            </Button>
           )}
         </div>
       </section>
@@ -106,15 +106,15 @@ export function IntegrationsSettings({
         </div>
 
         <div className="mt-4 space-y-3">
-          <UiInput
+          <Input
             placeholder="WakaTime API key"
             value={apiKey}
             onChange={(event) => setApiKey(event.target.value)}
           />
           <div className="flex flex-wrap gap-2">
-            <UiButton
-              isDisabled={busy !== null || !apiKey.trim()}
-              onPress={async () => {
+            <Button
+              disabled={busy !== null || !apiKey.trim()}
+              onClick={async () => {
                 setBusy("wakatime");
                 setMessage(null);
 
@@ -145,12 +145,12 @@ export function IntegrationsSettings({
               }}
             >
               Connect WakaTime
-            </UiButton>
+            </Button>
             {wakatimeOn ? (
-              <UiButton
-                isDisabled={busy !== null}
+              <Button
+                disabled={busy !== null}
                 variant="outline"
-                onPress={async () => {
+                onClick={async () => {
                   setBusy("wakatime");
                   setMessage(null);
 
@@ -177,7 +177,7 @@ export function IntegrationsSettings({
                 }}
               >
                 Disconnect
-              </UiButton>
+              </Button>
             ) : null}
           </div>
         </div>

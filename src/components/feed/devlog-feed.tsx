@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Avatar, Button, Card, Chip, Input, TextArea } from "@heroui/react";
 import type { ChangeEvent } from "react";
 import { useEffect, useState } from "react";
+
+import { Card } from "@/components/ui/card";
+import { UiPill } from "@/components/ui/pill";
+import { Textarea } from "../ui/textarea";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 
 type DevlogItem = {
   id: string;
@@ -91,192 +97,157 @@ export function DevlogFeed({ initialItems, currentUser }: Props) {
 
   return (
     <div className="space-y-4 px-4 py-4 sm:px-5">
-      <div className="flex items-start gap-3">
-        <Avatar size="md">
-          <Avatar.Image
-            alt={currentUser.name}
-            src={currentUser.avatar ?? undefined}
-          />
-          <Avatar.Fallback>
-            {currentUser.name.slice(0, 2).toUpperCase()}
-          </Avatar.Fallback>
-        </Avatar>
-        <form>
-          <TextArea
-            rows={5}
-            placeholder="Share a devlog update..."
-            value={content}
-            onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
-              setContent(event.target.value)
-            }
-          />
+      <Card>
+        <div className="flex items-start gap-3">
+          <Avatar>
+            <AvatarImage
+              className="size-10 rounded-xs object-cover"
+              src={currentUser.avatar ?? ""}
+            />
+            <AvatarFallback>{currentUser.name}</AvatarFallback>
+          </Avatar>
+          <form className="flex-1 space-y-3">
+            <Textarea
+              className="min-h-28"
+              placeholder="Share a devlog update..."
+              value={content}
+              onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+                setContent(event.target.value)
+              }
+            />
 
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-muted">
-              Post concise updates like a timeline.
-            </p>
-            <Button
-              isDisabled={isPosting || !content.trim()}
-              type="submit"
-              variant="primary"
-            >
-              {isPosting ? "Posting..." : "Post"}
-            </Button>
-          </div>
-          {error ? <p className="text-sm text-danger">{error}</p> : null}
-        </form>
-      </div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs">Post concise updates like a timeline.</p>
+              <Button disabled={isPosting || !content.trim()} type="submit">
+                {isPosting ? "Posting..." : "Post"}
+              </Button>
+            </div>
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
+          </form>
+        </div>
+      </Card>
 
       <section className="space-y-0">
         {items.map((item) => (
-          <Card
-            key={item.id}
-            className="rounded-xs border border-border bg-surface"
-            variant="default"
-          >
-            <Card.Content className="p-4">
-              <div className="flex items-start gap-3">
-                <Avatar size="sm">
-                  <Avatar.Image
-                    alt={item.owner.name}
-                    src={item.owner.avatar ?? undefined}
-                  />
-                  <Avatar.Fallback>
-                    {item.owner.name.slice(0, 2).toUpperCase()}
-                  </Avatar.Fallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-sm">
-                    <p className="font-semibold">{item.owner.name}</p>
-                    <Link
-                      className="text-muted hover:underline"
-                      href={`/${item.owner.username}`}
-                    >
-                      @{item.owner.username}
-                    </Link>
-                    <span className="text-muted">·</span>
-                    <p className="text-muted">
-                      {fromNow(item.recentActivityAt)}
-                    </p>
+          <Card key={item.id}>
+            <div className="flex items-start gap-3">
+              <img
+                alt={item.owner.name}
+                className="size-9 rounded-xs object-cover"
+                src={item.owner.avatar ?? ""}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-sm">
+                  <p className="font-semibold">{item.owner.name}</p>
+                  <Link
+                    className="text-muted hover:underline"
+                    href={`/${item.owner.username}`}
+                  >
+                    @{item.owner.username}
+                  </Link>
+                  <span className="text-muted">·</span>
+                  <p className="text-muted">{fromNow(item.recentActivityAt)}</p>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-foreground/85">
+                  {item.description}
+                </p>
+                {item.tags.length ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {item.tags.slice(0, 6).map((tag) => (
+                      <UiPill key={`${item.id}-${tag}`}>#{tag}</UiPill>
+                    ))}
                   </div>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-foreground/85">
-                    {item.description}
-                  </p>
-                  {item.tags.length ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {item.tags.slice(0, 6).map((tag) => (
-                        <Chip
-                          key={`${item.id}-${tag}`}
-                          size="sm"
-                          variant="soft"
-                        >
-                          #{tag}
-                        </Chip>
-                      ))}
+                ) : null}
+
+                <div className="mt-4 flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setOpenCommentPostId((current) =>
+                        current === item.id ? null : item.id,
+                      );
+                      setDraftComment("");
+                    }}
+                  >
+                    Comment ({commentsByPost[item.id]?.length ?? 0})
+                  </Button>
+                </div>
+
+                {openCommentPostId === item.id ? (
+                  <form
+                    className="mt-3 space-y-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+
+                      const nextText = draftComment.trim();
+                      if (!nextText) {
+                        return;
+                      }
+
+                      const nextComment: DevlogComment = {
+                        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                        text: nextText,
+                        authorName: currentUser.name,
+                        authorUsername: currentUser.username,
+                        createdAt: new Date().toISOString(),
+                      };
+
+                      setCommentsByPost((prev) => ({
+                        ...prev,
+                        [item.id]: [...(prev[item.id] ?? []), nextComment],
+                      }));
+                      setDraftComment("");
+                    }}
+                  >
+                    <Input
+                      placeholder="Write a comment"
+                      value={draftComment}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                        setDraftComment(event.target.value)
+                      }
+                    />
+                    <div className="flex justify-end">
+                      <Button disabled={!draftComment.trim()} type="submit">
+                        Add comment
+                      </Button>
                     </div>
-                  ) : null}
+                  </form>
+                ) : null}
 
-                  <div className="mt-4 flex items-center gap-3">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onPress={() => {
-                        setOpenCommentPostId((current) =>
-                          current === item.id ? null : item.id,
-                        );
-                        setDraftComment("");
-                      }}
-                    >
-                      Comment ({commentsByPost[item.id]?.length ?? 0})
-                    </Button>
-                  </div>
-
-                  {openCommentPostId === item.id ? (
-                    <form
-                      className="mt-3 space-y-2"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-
-                        const nextText = draftComment.trim();
-                        if (!nextText) {
-                          return;
-                        }
-
-                        const nextComment: DevlogComment = {
-                          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                          text: nextText,
-                          authorName: currentUser.name,
-                          authorUsername: currentUser.username,
-                          createdAt: new Date().toISOString(),
-                        };
-
-                        setCommentsByPost((prev) => ({
-                          ...prev,
-                          [item.id]: [...(prev[item.id] ?? []), nextComment],
-                        }));
-                        setDraftComment("");
-                      }}
-                    >
-                      <Input
-                        placeholder="Write a comment"
-                        value={draftComment}
-                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                          setDraftComment(event.target.value)
-                        }
-                      />
-                      <div className="flex justify-end">
-                        <Button
-                          isDisabled={!draftComment.trim()}
-                          size="sm"
-                          type="submit"
-                          variant="primary"
-                        >
-                          Add comment
-                        </Button>
-                      </div>
-                    </form>
-                  ) : null}
-
-                  {(commentsByPost[item.id] ?? []).length ? (
-                    <div className="mt-3 space-y-2">
-                      {(commentsByPost[item.id] ?? []).map((comment) => (
-                        <div
-                          key={comment.id}
-                          className="rounded-xs border border-border bg-default p-2.5"
-                        >
-                          <div className="flex items-center gap-2 text-xs">
-                            <p className="font-medium">{comment.authorName}</p>
-                            <Link
-                              className="text-muted hover:underline"
-                              href={`/${comment.authorUsername}`}
-                            >
-                              @{comment.authorUsername}
-                            </Link>
-                            <span className="text-muted">·</span>
-                            <p className="text-muted">
-                              {fromNow(comment.createdAt)}
-                            </p>
-                          </div>
-                          <p className="mt-1 text-sm text-foreground/85">
-                            {comment.text}
+                {(commentsByPost[item.id] ?? []).length ? (
+                  <div className="mt-3 space-y-2">
+                    {(commentsByPost[item.id] ?? []).map((comment) => (
+                      <div
+                        key={comment.id}
+                        className="rounded-xs border border-border bg-default p-2.5"
+                      >
+                        <div className="flex items-center gap-2 text-xs">
+                          <p className="font-medium">{comment.authorName}</p>
+                          <Link
+                            className="text-muted hover:underline"
+                            href={`/${comment.authorUsername}`}
+                          >
+                            @{comment.authorUsername}
+                          </Link>
+                          <span className="text-muted">·</span>
+                          <p className="text-muted">
+                            {fromNow(comment.createdAt)}
                           </p>
                         </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
+                        <p className="mt-1 text-sm text-foreground/85">
+                          {comment.text}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-            </Card.Content>
+            </div>
           </Card>
         ))}
         {!items.length ? (
-          <Card
-            className="rounded-xs border border-border bg-default"
-            variant="default"
-          >
-            <Card.Content className="px-4 py-5 text-sm text-muted">
-              No devlogs yet. Post your first update above.
-            </Card.Content>
+          <Card className="rounded-xs border border-border bg-muted px-4 py-5 text-sm text-muted">
+            No devlogs yet. Post your first update above.
           </Card>
         ) : null}
       </section>

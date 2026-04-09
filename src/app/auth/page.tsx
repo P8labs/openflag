@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { SignInCard } from "@/components/sign-in-card";
-import { UiCard } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 import { slugifyUsername } from "@/lib/username";
@@ -36,9 +36,9 @@ export default async function AuthPage({
     : undefined;
 
   return (
-    <main className="ui-page px-4 py-6 sm:px-6 lg:px-8">
+    <main className="px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto grid w-full max-w-5xl gap-6 lg:grid-cols-[1fr_0.9fr]">
-        <UiCard className="p-5 sm:p-6 lg:p-8">
+        <Card className="p-5 sm:p-6 lg:p-8">
           <p className="text-xs uppercase tracking-[0.24em] text-muted">
             Auth entry
           </p>
@@ -61,7 +61,7 @@ export default async function AuthPage({
             <p>No email signup form.</p>
             <p>Just identity, onboarding, and proof of work.</p>
           </div>
-        </UiCard>
+        </Card>
 
         <SignInCard claimedUsername={claimedUsername} />
       </div>

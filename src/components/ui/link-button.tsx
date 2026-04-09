@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link, { type LinkProps } from "next/link";
+import { cn } from "@/lib/utils";
 
 type UiLinkButtonProps = LinkProps & {
   className?: string;
@@ -14,18 +15,19 @@ export function UiLinkButton({
   ...props
 }: UiLinkButtonProps) {
   const variantClass =
-    variant === "primary" ? "ui-button-primary" : "ui-button-ghost";
-
-  const nextClassName = [
-    variantClass,
-    "inline-flex items-center justify-center px-4 py-2 text-sm font-medium transition-colors",
-    className,
-  ]
-    .filter(Boolean)
-    .join(" ");
+    variant === "primary"
+      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+      : "border border-border bg-background text-foreground hover:bg-muted";
 
   return (
-    <Link className={nextClassName} {...props}>
+    <Link
+      className={cn(
+        "inline-flex items-center justify-center rounded-xs px-4 py-2 text-sm font-medium transition-colors",
+        variantClass,
+        className,
+      )}
+      {...props}
+    >
       {children}
     </Link>
   );

@@ -17,17 +17,19 @@ export default async function PostProjectPage() {
   });
 
   return (
-    <div className="space-y-4 px-4 py-4 sm:px-5">
-      <header className="ui-panel p-4">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted">Create</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-          Post Project
+    <div className="space-y-5 px-4 py-4 sm:px-5">
+      <header className="rounded-xs border border-border bg-card px-4 py-4">
+        <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+          Create
+        </p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+          Post a project
         </h1>
-        <p className="mt-2 text-sm text-muted">
-          @{profile?.username ?? session.user.name}
+        <p className="mt-2 text-sm text-muted-foreground">
+          @{profile?.username ?? session.user.name} · Add links, context, and
+          optional WakaTime signal.
         </p>
       </header>
-
       <PostProjectForm />
     </div>
   );

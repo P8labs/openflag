@@ -4,10 +4,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { UiButton } from "@/components/ui/button";
-import { UiCard } from "@/components/ui/card";
 import { UiPill } from "@/components/ui/pill";
 import { slugifyUsername } from "@/lib/username";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
 
 export function LandingPage() {
   const router = useRouter();
@@ -102,16 +108,16 @@ export function LandingPage() {
               </div>
             </div>
 
-            <UiCard>
-              <UiCard.Header className="space-y-2">
-                <UiCard.Title className="text-2xl font-medium tracking-tight">
+            <Card>
+              <CardHeader className="space-y-2">
+                <CardTitle className="text-2xl font-medium tracking-tight">
                   Claim your username
-                </UiCard.Title>
-                <UiCard.Description className="text-sm text-muted">
+                </CardTitle>
+                <CardDescription className="text-sm text-muted">
                   Reserve your handle before entering auth.
-                </UiCard.Description>
-              </UiCard.Header>
-              <UiCard.Content className="grid gap-4 pt-2">
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 pt-2">
                 <label className="grid gap-2 text-sm text-muted">
                   Username
                   <div className="flex items-center gap-1 ui-input px-4 py-3">
@@ -129,24 +135,24 @@ export function LandingPage() {
                   Preview: @{claimedUsername}
                 </div>
 
-                <UiButton
+                <Button
                   className="rounded-xs"
                   size="lg"
-                  onPress={() =>
+                  onClick={() =>
                     router.push(
                       `/auth?username=${encodeURIComponent(claimedUsername)}`,
                     )
                   }
                 >
                   Continue to auth
-                </UiButton>
+                </Button>
 
                 <p className="text-xs leading-5 text-muted">
                   GitHub and Google are the only login options. Identity is
                   imported, then refined in onboarding.
                 </p>
-              </UiCard.Content>
-            </UiCard>
+              </CardContent>
+            </Card>
           </div>
         </section>
 
@@ -197,17 +203,17 @@ export function LandingPage() {
               Pick a handle and continue.
             </h2>
           </div>
-          <UiButton
+          <Button
             className="rounded-xs"
             size="lg"
-            onPress={() =>
+            onClick={() =>
               router.push(
                 `/auth?username=${encodeURIComponent(claimedUsername)}`,
               )
             }
           >
             Continue to auth
-          </UiButton>
+          </Button>
         </section>
       </div>
     </main>

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 type UiPillProps = {
   children: ReactNode;
@@ -6,12 +7,14 @@ type UiPillProps = {
 };
 
 export function UiPill({ children, className }: UiPillProps) {
-  const nextClassName = [
-    "ui-pill inline-flex items-center px-3 py-1 text-xs text-foreground/70",
-    className,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  return <span className={nextClassName}>{children}</span>;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-xs border border-border bg-muted px-2.5 py-1 text-xs text-muted-foreground",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
 }

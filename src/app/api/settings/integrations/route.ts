@@ -4,6 +4,7 @@ import { apiError, apiSuccess } from "@/lib/api";
 import { seedProfileFromAuth } from "@/lib/github-sync";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
+import { fetchWakatimeProjects, getWakatimeAccessToken } from "@/lib/wakatime";
 
 export async function GET() {
   const session = await getServerSession();
@@ -22,7 +23,19 @@ export async function GET() {
     (item) => item.providerId === "wakatime" && Boolean(item.accessToken),
   );
 
-  return apiSuccess({ githubConnected, wakatimeConnected });
+  let wakatimeProjects: Awaited<ReturnType<typeof fetchWakatimeProjects>> = [];
+  if (wakatimeConnected) {
+    const token = await getWakatimeAccessToken(session.user.id);
+    if (token) {
+      try {
+        wakatimeProjects = await fetchWakatimeProjects({ accessToken: token });
+      } catch {
+        wakatimeProjects = [];
+      }
+    }
+  }
+
+  return apiSuccess({ githubConnected, wakatimeConnected, wakatimeProjects });
 }
 
 export async function PATCH(request: Request) {

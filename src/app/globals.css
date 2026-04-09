@@ -5,15 +5,6 @@
 @custom-variant dark (&:is(.dark *));
 
 @layer base {
-  ::selection {
-    background: color-mix(in oklch, var(--accent) 20%, transparent);
-    color: var(--foreground);
-  }
-
-  .dark ::selection {
-    background: color-mix(in oklch, var(--accent) 30%, transparent);
-    color: var(--foreground);
-  }
   * {
     @apply border-border outline-ring/50;
   }

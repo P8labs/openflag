@@ -39,12 +39,6 @@ export default function LeftBar() {
             </Link>
           ))}
         </div>
-        <Link
-          href="/post-project"
-          className="ui-button-primary flex h-12 w-12 items-center justify-center xxl:hidden"
-        >
-          <HugeiconsIcon icon={Add01Icon} />
-        </Link>
       </div>
     </div>
   );
