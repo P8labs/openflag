@@ -3,12 +3,25 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { UiButton } from "@/components/ui/button";
-import { UiCard } from "@/components/ui/card";
-import { UiInput, UiSelect, UiTextArea } from "@/components/ui/field";
-import { UiPill } from "@/components/ui/pill";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { apiFetch } from "@/lib/api";
 import { slugifyUsername } from "@/lib/username";
+import { Badge } from "../ui/badge";
 
 type Profile = {
   username: string;
@@ -148,6 +161,7 @@ export function OnboardingWizard({ claimedUsername, profile, user }: Props) {
   const isIdentityStep = step === 0;
   const isDetailsStep = step === 1;
   const isProjectStep = step === 2;
+  const isComplete = step >= 3;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
@@ -160,73 +174,83 @@ export function OnboardingWizard({ claimedUsername, profile, user }: Props) {
       <div className="grid gap-4 lg:grid-cols-[0.92fr_1.08fr]">
         <aside className="ui-panel p-4 sm:p-5">
           <div className="flex flex-wrap gap-2">
-            <UiPill>Onboarding</UiPill>
-            <UiPill>Step {step + 1} of 3</UiPill>
+            <Badge>Onboarding</Badge>
+            <Badge>Step {step + 1} of 3</Badge>
           </div>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">
             Build trust before the feed starts ranking you.
           </h1>
-          <p className="mt-3 max-w-xl text-sm text-muted sm:text-base">
+          <p className="mt-3 max-w-xl text-sm text-muted-foreground">
             Step 1 is required. The rest can be skipped for now, but the banner
             will stay until every step is done.
           </p>
 
-          <div className="ui-panel-muted mt-6 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted">
+          <div className="bg-muted p-4 mt-3">
+            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
               Profile picture
             </p>
             <div className="mt-3 flex items-center gap-3">
               <img
                 alt={user.name}
-                className="size-14 rounded-xs object-cover ring-1 ring-black/10 dark:ring-white/10"
+                className="size-14 rounded-full object-cover"
                 src={profile?.avatar ?? user.image ?? ""}
               />
               <div>
                 <p className="text-sm font-medium">Imported from auth</p>
-                <p className="text-sm text-muted">Not editable at this step.</p>
+                <p className="text-sm text-muted-foreground">
+                  Not editable at this step.
+                </p>
               </div>
             </div>
           </div>
         </aside>
 
-        <UiCard className="p-4 sm:p-5">
-          <UiCard.Header className="space-y-2">
-            <UiCard.Title className="text-2xl font-medium tracking-tight sm:text-3xl">
+        <Card className="p-4 sm:p-5">
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-2xl font-medium tracking-tight sm:text-3xl">
               {isIdentityStep
                 ? "Identity"
                 : isDetailsStep
                   ? "Profile signals"
                   : "Project starter"}
-            </UiCard.Title>
-            <UiCard.Description className="max-w-2xl text-sm text-muted">
+            </CardTitle>
+            <CardDescription className="max-w-2xl text-sm text-muted-foreground">
               {isIdentityStep
                 ? "Claim your handle and tell people who you are."
                 : isDetailsStep
                   ? "Tell the app what you can do, what you want, and how you like to work."
-                  : "Create a first project post or skip for now and return later."}
-            </UiCard.Description>
-          </UiCard.Header>
+                  : isProjectStep
+                    ? "Create a first project post or skip for now and return later."
+                    : "You're all set. Head to feed and start posting."}
+            </CardDescription>
+          </CardHeader>
 
-          <UiCard.Content className="grid gap-4 pt-2">
+          <CardContent className="pt-2">
             {isIdentityStep ? (
-              <>
-                <label className="grid gap-2 text-sm text-muted">
-                  Username
-                  <UiInput
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="onboarding-username">
+                    Username
+                  </FieldLabel>
+                  <Input
+                    id="onboarding-username"
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
                   />
-                </label>
-                <label className="grid gap-2 text-sm text-muted">
-                  Name
-                  <UiInput
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="onboarding-name">Name</FieldLabel>
+                  <Input
+                    id="onboarding-name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                   />
-                </label>
-                <label className="grid gap-2 text-sm text-muted">
-                  Gender
-                  <UiSelect
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="onboarding-gender">Gender</FieldLabel>
+                  <select
+                    id="onboarding-gender"
+                    className="h-9 w-full rounded-xs border border-border bg-input px-3 text-sm outline-none"
                     value={gender}
                     onChange={(event) => setGender(event.target.value)}
                   >
@@ -235,61 +259,71 @@ export function OnboardingWizard({ claimedUsername, profile, user }: Props) {
                     <option value="man">Man</option>
                     <option value="non-binary">Non-binary</option>
                     <option value="prefer-not-to-say">Prefer not to say</option>
-                  </UiSelect>
-                </label>
-                <label className="grid gap-2 text-sm text-muted">
-                  Bio
-                  <UiTextArea
+                  </select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="onboarding-bio">Bio</FieldLabel>
+                  <Textarea
+                    id="onboarding-bio"
                     placeholder="What kind of builder are you?"
                     value={bio}
                     onChange={(event) => setBio(event.target.value)}
                   />
-                </label>
+                  <FieldDescription>
+                    Keep it concise and focused on what you build.
+                  </FieldDescription>
+                </Field>
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                  <p className="text-sm text-muted">
+                  <p className="text-sm text-muted-foreground">
                     Username, name, gender, and bio are required.
                   </p>
-                  <UiButton
-                    className="rounded-xs"
-                    isDisabled={isSaving}
-                    size="lg"
-                    onPress={saveIdentity}
-                  >
+                  <Button disabled={isSaving} size="lg" onClick={saveIdentity}>
                     {isSaving ? "Saving..." : "Continue"}
-                  </UiButton>
+                  </Button>
                 </div>
-              </>
+              </FieldGroup>
             ) : null}
 
             {isDetailsStep ? (
-              <>
-                <label className="grid gap-2 text-sm text-muted">
-                  Interests
-                  <UiInput
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="onboarding-interests">
+                    Interests
+                  </FieldLabel>
+                  <Input
+                    id="onboarding-interests"
                     placeholder="AI tools, open source, infra"
                     value={interests}
                     onChange={(event) => setInterests(event.target.value)}
                   />
-                </label>
-                <label className="grid gap-2 text-sm text-muted">
-                  Skills
-                  <UiInput
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="onboarding-skills">Skills</FieldLabel>
+                  <Input
+                    id="onboarding-skills"
                     placeholder="TypeScript, design systems, backend"
                     value={skills}
                     onChange={(event) => setSkills(event.target.value)}
                   />
-                </label>
-                <label className="grid gap-2 text-sm text-muted">
-                  Availability
-                  <UiInput
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="onboarding-availability">
+                    Availability
+                  </FieldLabel>
+                  <Input
+                    id="onboarding-availability"
                     placeholder="8 hrs/week, evenings"
                     value={availability}
                     onChange={(event) => setAvailability(event.target.value)}
                   />
-                </label>
-                <label className="grid gap-2 text-sm text-muted">
-                  Personality
-                  <UiSelect
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="onboarding-personality">
+                    Personality
+                  </FieldLabel>
+                  <select
+                    id="onboarding-personality"
+                    className="h-9 w-full rounded-xs border border-border bg-input px-3 text-sm outline-none"
                     value={personality}
                     onChange={(event) => setPersonality(event.target.value)}
                   >
@@ -297,60 +331,57 @@ export function OnboardingWizard({ claimedUsername, profile, user }: Props) {
                     <option value="introvert">Introvert</option>
                     <option value="extrovert">Extrovert</option>
                     <option value="it-depends">It depends</option>
-                  </UiSelect>
-                </label>
-                <label className="grid gap-2 text-sm text-muted">
-                  What are you looking for?
-                  <UiTextArea
+                  </select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="onboarding-looking-for">
+                    What are you looking for?
+                  </FieldLabel>
+                  <Textarea
+                    id="onboarding-looking-for"
                     placeholder="What makes someone worth building with?"
                     value={lookingFor}
                     onChange={(event) => setLookingFor(event.target.value)}
                   />
-                </label>
+                </Field>
 
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                   <button
-                    className="text-sm text-muted underline decoration-black/20 underline-offset-4 dark:decoration-white/20"
+                    className="text-sm text-muted-foreground underline underline-offset-4"
                     type="button"
                     onClick={() => setStep(2)}
                   >
                     Skip for now
                   </button>
-                  <UiButton
-                    className="rounded-xs"
-                    isDisabled={isSaving}
-                    size="lg"
-                    onPress={saveDetails}
-                  >
+                  <Button disabled={isSaving} size="lg" onClick={saveDetails}>
                     {isSaving ? "Saving..." : "Save profile signals"}
-                  </UiButton>
+                  </Button>
                 </div>
-              </>
+              </FieldGroup>
             ) : null}
 
             {isProjectStep ? (
               <>
-                <div className="ui-panel-muted p-5">
+                <div className="rounded-xs border border-border bg-muted p-5">
                   <p className="text-sm font-medium">
                     Create one proof-of-work post.
                   </p>
-                  <p className="mt-2 text-sm text-muted">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     Share a project, attach a GitHub URL, or come back later.
                     The banner stays until you finish this step.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                   <button
-                    className="text-sm text-muted underline decoration-black/20 underline-offset-4 dark:decoration-white/20"
+                    className="text-sm text-muted-foreground underline underline-offset-4"
                     type="button"
                     onClick={() => router.push("/feed")}
                   >
                     Skip for now
                   </button>
-                  <UiButton
-                    className="rounded-xs"
+                  <Button
                     size="lg"
-                    onPress={async () => {
+                    onClick={async () => {
                       await apiFetch<{ profile: Profile }>("/api/profile", {
                         method: "PATCH",
                         headers: {
@@ -362,14 +393,30 @@ export function OnboardingWizard({ claimedUsername, profile, user }: Props) {
                     }}
                   >
                     Create project post
-                  </UiButton>
+                  </Button>
                 </div>
               </>
             ) : null}
 
-            {message ? <p className="text-sm text-danger">{message}</p> : null}
-          </UiCard.Content>
-        </UiCard>
+            {isComplete ? (
+              <div className="rounded-xs border border-border bg-muted p-5">
+                <p className="text-sm font-medium">Onboarding complete.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Your profile is ready. Continue to feed.
+                </p>
+                <div className="mt-3">
+                  <Button size="sm" onClick={() => router.push("/feed")}>
+                    Go to feed
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {message ? (
+              <p className="text-sm text-destructive">{message}</p>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

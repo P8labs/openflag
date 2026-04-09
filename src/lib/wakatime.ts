@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { prisma } from "./prisma";
 
 type WakaTimeProjectApiItem = {
   id?: string;
@@ -27,10 +28,10 @@ function parseSeconds(value: unknown) {
 }
 
 export async function getWakatimeAccessToken(userId: string) {
-  const token = await auth.api.getAccessToken({
-    body: {
-      providerId: "wakatime",
-      userId,
+  const token = await prisma.account.findFirst({
+    where: {
+      accountId: `wakatime:${userId}`,
+      userId: userId,
     },
   });
 

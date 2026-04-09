@@ -34,29 +34,29 @@ export function SignInCard({ claimedUsername }: Props) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg items-center justify-center px-4 py-8">
-      <Card className="w-full p-4 sm:p-6">
-        <CardHeader className="space-y-2">
-          <UiPill>Authentication</UiPill>
-          <CardTitle className="text-2xl font-medium tracking-tight sm:text-3xl">
+    <div className="mx-auto w-full max-w-md px-4 py-12">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-medium tracking-tight">
             Sign in with proof-first identity
-          </CardTitle>
-          <CardDescription className="max-w-md text-sm text-muted">
-            Use GitHub or Google only. We pull your avatar automatically, then
-            take you into onboarding.
-          </CardDescription>
-          {claimedUsername ? (
-            <p className="text-sm text-foreground/70">
-              Username claimed: @{claimedUsername}
-            </p>
-          ) : null}
-        </CardHeader>
-        <CardContent className="grid gap-3 pt-2">
+          </h1>
+
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Use GitHub or Google. Your profile is created automatically, then
+            you continue to onboarding.
+          </p>
+
+          {claimedUsername && (
+            <p className="text-sm text-foreground/60">@{claimedUsername}</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
           <Button
-            className="rounded-xs"
-            disabled={pendingProvider !== null}
             variant="outline"
             size="lg"
+            className="justify-center"
+            disabled={pendingProvider !== null}
             onClick={async () => {
               await signIn("github");
             }}
@@ -65,10 +65,11 @@ export function SignInCard({ claimedUsername }: Props) {
               ? "Redirecting..."
               : "Continue with GitHub"}
           </Button>
+
           <Button
-            className="rounded-xs"
-            disabled={pendingProvider !== null}
             size="lg"
+            className="justify-center"
+            disabled={pendingProvider !== null}
             onClick={async () => {
               await signIn("google");
             }}
@@ -77,8 +78,8 @@ export function SignInCard({ claimedUsername }: Props) {
               ? "Redirecting..."
               : "Continue with Google"}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

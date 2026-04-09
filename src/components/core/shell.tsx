@@ -3,7 +3,7 @@ import { usePathname } from "next/navigation";
 import LeftBar from "./leftbar";
 import RightBar from "./rightbar";
 
-const noShell = ["/", "/auth"];
+const noShell = ["/", "/auth", "/onboarding"];
 
 export default function CoreShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
