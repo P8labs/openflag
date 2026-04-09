@@ -1,41 +1,78 @@
 "use client";
 
-import { Button, Card } from "@heroui/react";
+import { useState } from "react";
 
+import { UiButton } from "@/components/ui/button";
+import { UiCard } from "@/components/ui/card";
+import { UiPill } from "@/components/ui/pill";
 import { authClient } from "@/lib/auth-client";
 
-export function SignInCard() {
+type Props = {
+  claimedUsername?: string;
+};
+
+export function SignInCard({ claimedUsername }: Props) {
+  const [pendingProvider, setPendingProvider] = useState<
+    "github" | "google" | null
+  >(null);
+
+  async function signIn(provider: "github" | "google") {
+    setPendingProvider(provider);
+
+    await authClient.signIn.social({
+      provider,
+      callbackURL: claimedUsername
+        ? `/onboarding?claimed=${encodeURIComponent(claimedUsername)}`
+        : "/onboarding",
+    });
+  }
+
   return (
-    <div className="mx-auto flex min-h-[70vh] w-full max-w-lg items-center justify-center px-4 py-8">
-      <Card
-        className="w-full rounded-xs border border-black/5 bg-white/80 p-6 shadow-[0_1px_2px_rgba(0,0,0,0.02)] dark:border-white/10 dark:bg-white/5 sm:p-8"
-        variant="default"
-      >
-        <Card.Header className="space-y-2">
-          <Card.Title className="text-2xl font-medium tracking-tight sm:text-3xl">
-            Openflag
-          </Card.Title>
-          <Card.Description className="max-w-md text-sm text-muted">
-            Discover collaborators in seconds. Swipe creators and projects until
-            you find a fit.
-          </Card.Description>
-        </Card.Header>
-        <Card.Content>
-          <Button
+    <div className="mx-auto flex w-full max-w-lg items-center justify-center px-4 py-8">
+      <UiCard className="w-full p-4 sm:p-6">
+        <UiCard.Header className="space-y-2">
+          <UiPill>Authentication</UiPill>
+          <UiCard.Title className="text-2xl font-medium tracking-tight sm:text-3xl">
+            Sign in with proof-first identity
+          </UiCard.Title>
+          <UiCard.Description className="max-w-md text-sm text-muted">
+            Use GitHub or Google only. We pull your avatar automatically, then
+            take you into onboarding.
+          </UiCard.Description>
+          {claimedUsername ? (
+            <p className="text-sm text-foreground/70">
+              Username claimed: @{claimedUsername}
+            </p>
+          ) : null}
+        </UiCard.Header>
+        <UiCard.Content className="grid gap-3 pt-2">
+          <UiButton
             className="rounded-xs"
+            isDisabled={pendingProvider !== null}
             variant="outline"
             size="lg"
             onPress={async () => {
-              await authClient.signIn.social({
-                provider: "github",
-                callbackURL: "/",
-              });
+              await signIn("github");
             }}
           >
-            Continue with GitHub
-          </Button>
-        </Card.Content>
-      </Card>
+            {pendingProvider === "github"
+              ? "Redirecting..."
+              : "Continue with GitHub"}
+          </UiButton>
+          <UiButton
+            className="rounded-xs"
+            isDisabled={pendingProvider !== null}
+            size="lg"
+            onPress={async () => {
+              await signIn("google");
+            }}
+          >
+            {pendingProvider === "google"
+              ? "Redirecting..."
+              : "Continue with Google"}
+          </UiButton>
+        </UiCard.Content>
+      </UiCard>
     </div>
   );
 }

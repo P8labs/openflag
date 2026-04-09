@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PAGE_PREFIXES = ["/", "/roadmap"];
 const PROTECTED_PAGE_PREFIXES = [
   "/app",
+  "/auth",
+  "/onboarding",
   "/dashboard",
   "/feed",
   "/projects",
@@ -11,6 +13,7 @@ const PROTECTED_PAGE_PREFIXES = [
   "/post-project",
   "/manage-projects",
   "/profile",
+  "/settings",
 ];
 
 function hasSessionCookie(request: NextRequest) {

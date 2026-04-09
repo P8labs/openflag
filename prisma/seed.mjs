@@ -88,6 +88,8 @@ async function main() {
         interests: user.interests,
         availability: user.availability,
         onboardingComplete: true,
+        onboardingDetailsComplete: true,
+        onboardingProjectComplete: true,
         recentActivityAt: new Date(),
       },
       create: {
@@ -99,6 +101,8 @@ async function main() {
         interests: user.interests,
         availability: user.availability,
         onboardingComplete: true,
+        onboardingDetailsComplete: true,
+        onboardingProjectComplete: true,
         recentActivityAt: new Date(),
       },
     });
@@ -195,6 +199,26 @@ async function main() {
       tags: ["DevEx", "Ops", "Platform"],
       recentActivityAt: daysAgo(2),
     },
+    {
+      id: "project-friday-devlog",
+      ownerId: "demo-arya",
+      title: "Friday shipping notes",
+      description:
+        "Shipped profile signal badges, trimmed latency on feed queries, and cleaned up noisy UI borders.",
+      requiredRoles: ["TypeScript", "Product"],
+      tags: ["devlog", "shipping", "frontend"],
+      recentActivityAt: daysAgo(0),
+    },
+    {
+      id: "project-wakatime-sync-proto",
+      ownerId: "demo-noah",
+      title: "WakaTime sync prototype",
+      description:
+        "Prototyped account-level WakaTime key storage and started wiring coding-time summaries into profile signals.",
+      requiredRoles: ["APIs", "Backend"],
+      tags: ["devlog", "wakatime", "integrations"],
+      recentActivityAt: daysAgo(0),
+    },
   ];
 
   for (const project of projects) {
@@ -287,7 +311,7 @@ async function main() {
     },
   });
 
-  console.log("Seeded demo users, projects, swipes, and matches.");
+  console.log("Seeded demo users, devlogs/projects, swipes, and matches.");
 }
 
 main()

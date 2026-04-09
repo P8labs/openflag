@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { apiError, apiSuccess } from "@/lib/api";
 import { starRepositoryForUser } from "@/lib/github-sync";
 import { getServerSession } from "@/lib/session";
 
@@ -8,7 +9,7 @@ export async function POST(request: Request) {
   const session = await getServerSession();
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   const body = (await request.json()) as {
@@ -18,10 +19,7 @@ export async function POST(request: Request) {
   const repositoryFullName = body.repositoryFullName?.trim();
 
   if (!repositoryFullName) {
-    return NextResponse.json(
-      { error: "repositoryFullName is required." },
-      { status: 400 },
-    );
+    return apiError("repositoryFullName is required.", 400);
   }
 
   const result = await starRepositoryForUser({
@@ -42,8 +40,8 @@ export async function POST(request: Request) {
               ? 403
               : 502;
 
-    return NextResponse.json({ error: result.reason }, { status });
+    return apiError(result.reason, status);
   }
 
-  return NextResponse.json({ starred: true });
+  return apiSuccess({ starred: true });
 }

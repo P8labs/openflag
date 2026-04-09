@@ -27,7 +27,7 @@ export function ProfileSetupForm({
 
   return (
     <Card
-      className="mx-auto mt-8 w-full max-w-2xl rounded-xs border border-black/5 bg-white/80 p-6 shadow-[0_1px_2px_rgba(0,0,0,0.02)] dark:border-white/10 dark:bg-white/5"
+      className="ui-panel mx-auto mt-8 w-full max-w-2xl p-6"
       variant="default"
     >
       <Card.Header className="space-y-2">
@@ -43,7 +43,7 @@ export function ProfileSetupForm({
         <label className="grid gap-2 text-sm text-muted">
           Bio
           <textarea
-            className="min-h-24 rounded-xs border border-black/10 bg-transparent p-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted/80 focus:border-black/20 dark:border-white/10 dark:focus:border-white/20"
+            className="ui-input ui-textarea"
             value={bio}
             onChange={(event) => setBio(event.target.value)}
             placeholder="What kind of collaboration are you looking for?"
@@ -52,7 +52,7 @@ export function ProfileSetupForm({
         <label className="grid gap-2 text-sm text-muted">
           Skills
           <input
-            className="rounded-xs border border-black/10 bg-transparent p-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted/80 focus:border-black/20 dark:border-white/10 dark:focus:border-white/20"
+            className="ui-input"
             value={skillsText}
             onChange={(event) => setSkillsText(event.target.value)}
             placeholder="Comma separated: TypeScript, UI Design, Rust"
@@ -61,7 +61,7 @@ export function ProfileSetupForm({
         <label className="grid gap-2 text-sm text-muted">
           Interests
           <input
-            className="rounded-xs border border-black/10 bg-transparent p-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted/80 focus:border-black/20 dark:border-white/10 dark:focus:border-white/20"
+            className="ui-input"
             value={interestsText}
             onChange={(event) => setInterestsText(event.target.value)}
             placeholder="Comma separated: AI tools, SaaS, Open source"
@@ -70,7 +70,7 @@ export function ProfileSetupForm({
         <label className="grid gap-2 text-sm text-muted">
           Availability
           <input
-            className="rounded-xs border border-black/10 bg-transparent p-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted/80 focus:border-black/20 dark:border-white/10 dark:focus:border-white/20"
+            className="ui-input"
             value={availability}
             onChange={(event) => setAvailability(event.target.value)}
             placeholder="Example: 8 hrs/week evenings"

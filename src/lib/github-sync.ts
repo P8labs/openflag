@@ -1,7 +1,8 @@
-import type { Prisma } from "@/generated/prisma";
+import { Prisma } from "@/generated/prisma";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { buildDraftUsername } from "@/lib/username";
 
 type GitHubProfile = {
   login: string;
@@ -185,22 +186,60 @@ export async function starRepositoryForUser({
   return { starred: false, reason: "github_request_failed" as const };
 }
 
-export async function syncGithubOnboarding({
+export async function seedProfileFromAuth({
   userId,
   useHeaderFallback,
+  headers,
 }: {
   userId: string;
   useHeaderFallback?: Headers;
+  headers?: Headers;
 }) {
   const accessTokenResult = await auth.api.getAccessToken({
     body: {
       providerId: "github",
       userId,
     },
-    headers: useHeaderFallback,
+    headers: useHeaderFallback ?? headers,
   });
 
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, image: true },
+  });
+
+  const fallbackUsername = buildDraftUsername(user?.name ?? "builder", userId);
+
   if (!accessTokenResult?.accessToken) {
+    await prisma.profileMeta.upsert({
+      where: { userId },
+      update: {
+        username: fallbackUsername,
+        avatar: user?.image ?? null,
+        onboardingComplete: false,
+        onboardingDetailsComplete: false,
+        onboardingProjectComplete: false,
+        recentActivityAt: new Date(),
+      },
+      create: {
+        userId,
+        username: fallbackUsername,
+        avatar: user?.image ?? null,
+        bio: null,
+        gender: null,
+        personality: null,
+        lookingFor: null,
+        skills: [],
+        interests: [],
+        topRepositories: Prisma.DbNull,
+        availability: null,
+        onboardingComplete: false,
+        onboardingDetailsComplete: false,
+        onboardingProjectComplete: false,
+        recentActivityAt: new Date(),
+      },
+    });
+
     return { synced: false, reason: "missing_access_token" as const };
   }
 
@@ -215,23 +254,31 @@ export async function syncGithubOnboarding({
   await prisma.profileMeta.upsert({
     where: { userId },
     update: {
-      username: profile.login,
+      username: profile.login || fallbackUsername,
       avatar: profile.avatar_url,
       bio: profile.bio,
       skills: derivedSkills,
       topRepositories: metadata,
-      onboardingComplete: true,
+      onboardingComplete: false,
+      onboardingDetailsComplete: false,
+      onboardingProjectComplete: false,
       recentActivityAt: new Date(),
     },
     create: {
       userId,
-      username: profile.login,
+      username: profile.login || fallbackUsername,
       avatar: profile.avatar_url,
       bio: profile.bio,
+      gender: null,
+      personality: null,
+      lookingFor: null,
       skills: derivedSkills,
       interests: [],
       topRepositories: metadata,
-      onboardingComplete: true,
+      availability: null,
+      onboardingComplete: false,
+      onboardingDetailsComplete: false,
+      onboardingProjectComplete: false,
       recentActivityAt: new Date(),
     },
   });
@@ -239,8 +286,8 @@ export async function syncGithubOnboarding({
   await prisma.user.update({
     where: { id: userId },
     data: {
-      name: profile.login,
-      image: profile.avatar_url,
+      name: profile.login || user?.name || fallbackUsername,
+      image: profile.avatar_url || user?.image || null,
     },
   });
 

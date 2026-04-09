@@ -1,7 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { BellIcon } from "@/components/app-icons";
-import { MobileNav } from "@/components/mobile-nav";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 
@@ -9,7 +7,7 @@ export default async function NotificationsPage() {
   const session = await getServerSession();
 
   if (!session) {
-    redirect("/");
+    redirect("/auth");
   }
 
   const [latestMatches, ownProjects] = await Promise.all([
@@ -49,33 +47,38 @@ export default async function NotificationsPage() {
     })),
   ].slice(0, 20);
 
+  const profile = await prisma.profileMeta.findUnique({
+    where: { userId: session.user.id },
+    select: { username: true },
+  });
+
   return (
-    <main className="min-h-screen bg-[#080b12] text-white">
-      <section className="relative mx-auto w-full max-w-3xl px-4 pb-24 pt-5">
-        <div className="flex items-center gap-2 text-sm text-white/70">
-          <BellIcon className="size-4" />
-          <p className="uppercase tracking-[0.2em]">Notifications</p>
-        </div>
-        <h1 className="mt-1 text-4xl font-semibold tracking-tight">Updates</h1>
+    <div className="space-y-4 px-4 py-4 sm:px-5">
+      <header className="ui-panel p-4">
+        <p className="text-xs uppercase tracking-[0.2em] text-muted">
+          Notifications
+        </p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Updates</h1>
+        <p className="mt-2 text-sm text-muted">
+          @{profile?.username ?? session.user.name}
+        </p>
+      </header>
 
-        <div className="mt-4 space-y-3">
-          {items.map((item) => (
-            <article
-              key={item.id}
-              className="rounded-[20px] border border-white/10 bg-[#151b25] px-4 py-3 text-sm text-white/80"
-            >
-              {item.text}
-            </article>
-          ))}
-          {!items.length ? (
-            <p className="rounded-[20px] border border-white/10 bg-[#151b25] px-4 py-3 text-sm text-white/70">
-              No notifications yet.
-            </p>
-          ) : null}
-        </div>
-
-        <MobileNav />
-      </section>
-    </main>
+      <div className="space-y-3">
+        {items.map((item) => (
+          <article
+            key={item.id}
+            className="ui-panel-muted px-4 py-3 text-sm text-foreground/80"
+          >
+            {item.text}
+          </article>
+        ))}
+        {!items.length ? (
+          <p className="ui-panel-muted px-4 py-3 text-sm text-muted">
+            No notifications yet.
+          </p>
+        ) : null}
+      </div>
+    </div>
   );
 }

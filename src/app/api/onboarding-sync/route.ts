@@ -1,20 +1,20 @@
 import { headers } from "next/headers";
-import { NextResponse } from "next/server";
 
-import { syncGithubOnboarding } from "@/lib/github-sync";
+import { apiError, apiSuccess } from "@/lib/api";
+import { seedProfileFromAuth } from "@/lib/github-sync";
 import { getServerSession } from "@/lib/session";
 
 export async function POST() {
   const session = await getServerSession();
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
-  const result = await syncGithubOnboarding({
+  const result = await seedProfileFromAuth({
     userId: session.user.id,
     useHeaderFallback: await headers(),
   });
 
-  return NextResponse.json(result);
+  return apiSuccess(result);
 }

@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-
+import { apiError, apiSuccess } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 
@@ -7,7 +6,7 @@ export async function GET() {
   const session = await getServerSession();
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   const matches = await prisma.match.findMany({
@@ -30,5 +29,5 @@ export async function GET() {
     take: 30,
   });
 
-  return NextResponse.json({ matches });
+  return apiSuccess({ matches });
 }

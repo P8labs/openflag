@@ -1,6 +1,7 @@
 import { MatchType, SwipeDirection } from "@/generated/prisma";
 import { NextResponse } from "next/server";
 
+import { apiError, apiSuccess } from "@/lib/api";
 import { starRepositoryForUser } from "@/lib/github-sync";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
   const session = await getServerSession();
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   const body = (await request.json()) as {
@@ -29,10 +30,7 @@ export async function POST(request: Request) {
     !body.targetId ||
     (body.targetType !== "user" && body.targetType !== "project")
   ) {
-    return NextResponse.json(
-      { error: "Invalid swipe payload" },
-      { status: 400 },
-    );
+    return apiError("Invalid swipe payload", 400);
   }
 
   const profile = await prisma.profileMeta.findUnique({
@@ -41,10 +39,7 @@ export async function POST(request: Request) {
   });
 
   if (!profile?.onboardingComplete) {
-    return NextResponse.json(
-      { error: "Complete profile setup before swiping." },
-      { status: 400 },
-    );
+    return apiError("Complete profile setup before swiping.", 400);
   }
 
   const startOfDay = new Date();
@@ -58,10 +53,7 @@ export async function POST(request: Request) {
   });
 
   if (swipeCountToday >= DAILY_SWIPE_LIMIT) {
-    return NextResponse.json(
-      { error: "Daily swipe limit reached. Come back tomorrow." },
-      { status: 429 },
-    );
+    return apiError("Daily swipe limit reached. Come back tomorrow.", 429);
   }
 
   const direction =
@@ -166,7 +158,7 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({
+  return apiSuccess({
     matched,
     matchId,
     starredRepository,

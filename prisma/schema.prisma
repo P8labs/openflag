@@ -75,19 +75,24 @@ model Verification {
 }
 
 model ProfileMeta {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  username           String   @unique
-  avatar             String?
-  bio                String?
-  skills             String[] @default([])
-  interests          String[] @default([])
-  topRepositories    Json?
-  availability       String?
-  onboardingComplete Boolean  @default(false)
-  recentActivityAt   DateTime @default(now())
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  userId                    String   @unique
+  username                  String   @unique
+  avatar                    String?
+  bio                       String?
+  gender                    String?
+  personality               String?
+  lookingFor                String?
+  skills                    String[] @default([])
+  interests                 String[] @default([])
+  topRepositories           Json?
+  availability              String?
+  onboardingComplete        Boolean  @default(false)
+  onboardingDetailsComplete Boolean  @default(false)
+  onboardingProjectComplete Boolean  @default(false)
+  recentActivityAt          DateTime @default(now())
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { SwipeFeed } from "@/components/swipe-feed";
-import { getFeedPage } from "@/lib/feed";
+import { DevlogFeed } from "@/components/feed/devlog-feed";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 
@@ -9,28 +8,52 @@ export default async function FeedPage() {
   const session = await getServerSession();
 
   if (!session) {
-    redirect("/");
+    redirect("/auth");
   }
 
   const profile = await prisma.profileMeta.findUnique({
     where: { userId: session.user.id },
-    select: { onboardingComplete: true },
   });
 
   if (!profile?.onboardingComplete) {
-    redirect("/");
+    redirect("/onboarding");
   }
 
-  const initialFeed = await getFeedPage({
-    userId: session.user.id,
-    limit: 12,
+  const projects = await prisma.project.findMany({
+    where: { isActive: true },
+    include: {
+      owner: {
+        select: {
+          name: true,
+          profileMeta: {
+            select: { username: true, avatar: true },
+          },
+        },
+      },
+    },
+    orderBy: { recentActivityAt: "desc" },
+    take: 40,
   });
 
   return (
-    <main className="min-h-screen bg-[#080b12]">
-      <div className="mx-auto flex w-full max-w-3xl justify-center">
-        <SwipeFeed initialData={initialFeed} />
-      </div>
-    </main>
+    <DevlogFeed
+      currentUser={{
+        name: session.user.name,
+        username: profile.username,
+        avatar: profile.avatar,
+      }}
+      initialItems={projects.map((project) => ({
+        id: project.id,
+        title: project.title,
+        description: project.description,
+        tags: project.tags,
+        recentActivityAt: project.recentActivityAt.toISOString(),
+        owner: {
+          name: project.owner.name,
+          username: project.owner.profileMeta?.username ?? "unknown",
+          avatar: project.owner.profileMeta?.avatar ?? null,
+        },
+      }))}
+    />
   );
 }

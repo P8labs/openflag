@@ -5,7 +5,6 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { motion, type PanInfo, useAnimation } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 
-import { MobileNav } from "@/components/mobile-nav";
 import { ProjectMedia } from "@/components/project-media";
 import type { FeedItem } from "@/lib/feed";
 
@@ -360,8 +359,6 @@ export function SwipeFeed({ initialData }: { initialData: FeedResponse }) {
           i
         </Button>
       </div>
-
-      <MobileNav />
 
       <DetailModal
         isOpen={Boolean(expandedItem)}

@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-
+import { apiError, apiSuccess } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 
@@ -21,18 +20,18 @@ export async function PATCH(
   const session = await getServerSession();
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   const { id } = await params;
   const existing = await prisma.project.findUnique({ where: { id } });
 
   if (!existing) {
-    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    return apiError("Project not found", 404);
   }
 
   if (existing.ownerId !== session.user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return apiError("Forbidden", 403);
   }
 
   const body = (await request.json()) as {
@@ -65,7 +64,7 @@ export async function PATCH(
     },
   });
 
-  return NextResponse.json({ project });
+  return apiSuccess({ project });
 }
 
 export async function DELETE(
@@ -75,21 +74,21 @@ export async function DELETE(
   const session = await getServerSession();
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   const { id } = await params;
   const existing = await prisma.project.findUnique({ where: { id } });
 
   if (!existing) {
-    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    return apiError("Project not found", 404);
   }
 
   if (existing.ownerId !== session.user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return apiError("Forbidden", 403);
   }
 
   await prisma.project.delete({ where: { id } });
 
-  return NextResponse.json({ deleted: true });
+  return apiSuccess({ success: true });
 }

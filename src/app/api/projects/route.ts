@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-
+import { apiError, apiSuccess } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 
@@ -18,7 +17,7 @@ export async function GET() {
   const session = await getServerSession();
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   const projects = await prisma.project.findMany({
@@ -41,14 +40,14 @@ export async function GET() {
     take: 200,
   });
 
-  return NextResponse.json({ projects });
+  return apiSuccess({ projects });
 }
 
 export async function POST(request: Request) {
   const session = await getServerSession();
 
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   const body = (await request.json()) as {
@@ -68,10 +67,7 @@ export async function POST(request: Request) {
   const video = body.video?.trim() || null;
 
   if (!title || !description) {
-    return NextResponse.json(
-      { error: "title and description are required." },
-      { status: 400 },
-    );
+    return apiError("title and description are required.", 400);
   }
 
   const project = await prisma.project.create({
@@ -93,5 +89,5 @@ export async function POST(request: Request) {
     data: { recentActivityAt: new Date() },
   });
 
-  return NextResponse.json({ project }, { status: 201 });
+  return apiSuccess({ project }, { status: 201 });
 }

@@ -1,7 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { HeartIcon } from "@/components/app-icons";
-import { MobileNav } from "@/components/mobile-nav";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 
@@ -9,7 +7,7 @@ export default async function MatchesPage() {
   const session = await getServerSession();
 
   if (!session) {
-    redirect("/");
+    redirect("/auth");
   }
 
   const matches = await prisma.match.findMany({
@@ -32,39 +30,39 @@ export default async function MatchesPage() {
     take: 50,
   });
 
+  const profile = await prisma.profileMeta.findUnique({
+    where: { userId: session.user.id },
+    select: { username: true },
+  });
+
   return (
-    <main className="min-h-screen bg-[#080b12] text-white">
-      <section className="relative mx-auto w-full max-w-3xl px-4 pb-24 pt-5">
-        <div className="flex items-center gap-2 text-sm text-white/70">
-          <HeartIcon className="size-4" />
-          <p className="uppercase tracking-[0.2em]">Matches</p>
-        </div>
-        <h1 className="mt-1 text-4xl font-semibold tracking-tight">
+    <div className="space-y-4 px-4 py-4 sm:px-5">
+      <header className="ui-panel p-4">
+        <p className="text-xs uppercase tracking-[0.2em] text-muted">Matches</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">
           Your Circle
         </h1>
+        <p className="mt-2 text-sm text-muted">
+          @{profile?.username ?? session.user.name}
+        </p>
+      </header>
 
-        <div className="mt-4 space-y-3">
-          {matches.map((match) => (
-            <article
-              key={match.id}
-              className="rounded-[20px] border border-white/10 bg-[#151b25] px-4 py-3"
-            >
-              <p className="text-sm text-white/80">
-                {match.type === "USER_USER"
-                  ? `${match.userA?.name ?? "Unknown"} and ${match.userB?.name ?? "Unknown"} matched`
-                  : `${match.interestedUser?.name ?? "Someone"} is interested in ${match.project?.title ?? "a project"}`}
-              </p>
-            </article>
-          ))}
-          {!matches.length ? (
-            <p className="rounded-[20px] border border-white/10 bg-[#151b25] px-4 py-3 text-sm text-white/70">
-              No matches yet. Keep swiping on Feed.
+      <div className="space-y-3">
+        {matches.map((match) => (
+          <article key={match.id} className="ui-panel-muted px-4 py-3">
+            <p className="text-sm text-foreground/80">
+              {match.type === "USER_USER"
+                ? `${match.userA?.name ?? "Unknown"} and ${match.userB?.name ?? "Unknown"} matched`
+                : `${match.interestedUser?.name ?? "Someone"} is interested in ${match.project?.title ?? "a project"}`}
             </p>
-          ) : null}
-        </div>
-
-        <MobileNav />
-      </section>
-    </main>
+          </article>
+        ))}
+        {!matches.length ? (
+          <p className="ui-panel-muted px-4 py-3 text-sm text-muted">
+            No matches yet. Keep swiping on Feed.
+          </p>
+        ) : null}
+      </div>
+    </div>
   );
 }

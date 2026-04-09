@@ -1,9 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { GridIcon } from "@/components/app-icons";
-import { MobileNav } from "@/components/mobile-nav";
 import { ProjectMedia } from "@/components/project-media";
+import { UiLinkButton } from "@/components/ui/link-button";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "@/lib/session";
 
@@ -11,7 +9,7 @@ export default async function ProjectsPage() {
   const session = await getServerSession();
 
   if (!session) {
-    redirect("/");
+    redirect("/auth");
   }
 
   const projects = await prisma.project.findMany({
@@ -30,52 +28,50 @@ export default async function ProjectsPage() {
     take: 40,
   });
 
+  const profile = await prisma.profileMeta.findUnique({
+    where: { userId: session.user.id },
+    select: { username: true },
+  });
+
   return (
-    <main className="min-h-screen bg-[#080b12] text-white">
-      <section className="relative mx-auto w-full max-w-3xl px-4 pb-24 pt-5">
-        <div className="flex items-center gap-2 text-sm text-white/70">
-          <GridIcon className="size-4" />
-          <p className="uppercase tracking-[0.2em]">Projects</p>
-        </div>
-        <h1 className="mt-1 text-4xl font-semibold tracking-tight">Discover</h1>
+    <div className="space-y-4 px-4 py-4 sm:px-5">
+      <header className="ui-panel p-4">
+        <p className="text-xs uppercase tracking-[0.2em] text-muted">
+          Projects
+        </p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Discover</h1>
+        <p className="mt-2 text-sm text-muted">
+          @{profile?.username ?? session.user.name}
+        </p>
+      </header>
 
-        <div className="mt-4 space-y-3">
-          {projects.map((project) => (
-            <article
-              key={project.id}
-              className="overflow-hidden rounded-[22px] border border-white/10 bg-[#151b25] p-3"
-            >
-              <ProjectMedia
-                className="h-56 w-full"
-                image={project.image}
-                title={project.title}
-                video={project.video}
-              />
-              <div className="mt-3">
-                <p className="text-base font-semibold">{project.title}</p>
-                <p className="mt-0.5 text-xs text-white/60">
-                  by @
-                  {project.owner.profileMeta?.username ?? project.owner.name}
-                </p>
-                <p className="mt-2 line-clamp-2 text-sm text-white/75">
-                  {project.description}
-                </p>
-              </div>
-            </article>
-          ))}
-        </div>
+      <div className="space-y-3">
+        {projects.map((project) => (
+          <article key={project.id} className="overflow-hidden ui-panel p-3">
+            <ProjectMedia
+              className="h-56 w-full"
+              image={project.image}
+              title={project.title}
+              video={project.video}
+            />
+            <div className="mt-3">
+              <p className="text-base font-semibold">{project.title}</p>
+              <p className="mt-0.5 text-xs text-muted">
+                by @{project.owner.profileMeta?.username ?? project.owner.name}
+              </p>
+              <p className="mt-2 line-clamp-2 text-sm text-foreground/75">
+                {project.description}
+              </p>
+            </div>
+          </article>
+        ))}
+      </div>
 
-        <div className="mt-4 flex items-center justify-center">
-          <Link
-            className="rounded-full bg-white px-4 py-2 text-sm font-medium text-black"
-            href="/post-project"
-          >
-            Post a Project
-          </Link>
-        </div>
-
-        <MobileNav />
-      </section>
-    </main>
+      <div className="pt-2">
+        <UiLinkButton variant="primary" href="/post-project">
+          Post a Project
+        </UiLinkButton>
+      </div>
+    </div>
   );
 }
