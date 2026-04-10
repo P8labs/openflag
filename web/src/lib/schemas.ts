@@ -1,0 +1,37 @@
+import { z } from "zod";
+
+export const projectFormSchema = z.object({
+  title: z.string().trim().min(2, "Title is required."),
+  description: z.string().trim().min(10, "Description is required."),
+  githubUrl: z.string().trim().url().optional().or(z.literal("")),
+  wakatimeId: z.string().trim().optional().or(z.literal("")),
+  tags: z.string().trim().optional().or(z.literal("")),
+});
+
+export type ProjectFormValues = z.infer<typeof projectFormSchema>;
+
+export const onboardingStepOneSchema = z.object({
+  username: z.string().trim().min(3, "Username is required."),
+  bio: z.string().trim().min(1, "Bio is required."),
+  skills: z.array(z.string().trim()).default([]),
+  interests: z.array(z.string().trim()).default([]),
+});
+
+export const onboardingStepTwoSchema = z.object({
+  availability: z.string().trim().optional().or(z.literal("")),
+  lookingFor: z.string().trim().optional().or(z.literal("")),
+});
+
+export const onboardingStepThreeSchema = z.object({
+  wakatimeApiKey: z.string().trim().optional().or(z.literal("")),
+});
+
+export type OnboardingStepOneValues = z.infer<typeof onboardingStepOneSchema>;
+export type OnboardingStepTwoValues = z.infer<typeof onboardingStepTwoSchema>;
+export type OnboardingStepThreeValues = z.infer<
+  typeof onboardingStepThreeSchema
+>;
+
+export type OnboardingStepValues = OnboardingStepOneValues &
+  OnboardingStepTwoValues &
+  OnboardingStepThreeValues;
