@@ -1,0 +1,287 @@
+package auth
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"openflag/internal/config"
+	"openflag/internal/models"
+
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/github"
+	"golang.org/x/oauth2/google"
+	gorm "gorm.io/gorm"
+)
+
+var ErrInvalidProvider = errors.New("invalid oauth provider")
+
+type Service struct {
+	repo       *Repository
+	cfg        config.Config
+	providers  map[string]*oauth2.Config
+	httpClient *http.Client
+}
+
+func NewService(repo *Repository, cfg config.Config) *Service {
+	providers := map[string]*oauth2.Config{}
+
+	if cfg.GitHubClientID != "" && cfg.GitHubClientSecret != "" {
+		providers[string(ProviderGitHub)] = &oauth2.Config{
+			ClientID:     cfg.GitHubClientID,
+			ClientSecret: cfg.GitHubClientSecret,
+			RedirectURL:  fmt.Sprintf("%s/api/v1/auth/github/callback", strings.TrimRight(cfg.BaseURL, "/")),
+			Scopes:       []string{"read:user", "user:email"},
+			Endpoint:     github.Endpoint,
+		}
+	}
+
+	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
+		providers[string(ProviderGoogle)] = &oauth2.Config{
+			ClientID:     cfg.GoogleClientID,
+			ClientSecret: cfg.GoogleClientSecret,
+			RedirectURL:  fmt.Sprintf("%s/api/v1/auth/google/callback", strings.TrimRight(cfg.BaseURL, "/")),
+			Scopes:       []string{"openid", "email", "profile"},
+			Endpoint:     google.Endpoint,
+		}
+	}
+
+	return &Service{
+		repo:       repo,
+		cfg:        cfg,
+		providers:  providers,
+		httpClient: &http.Client{Timeout: 10 * time.Second},
+	}
+}
+
+func (s *Service) LoginURL(provider string) (LoginResponse, error) {
+	cfg, ok := s.providers[provider]
+	if !ok {
+		return LoginResponse{}, ErrInvalidProvider
+	}
+
+	state, err := randomState()
+	if err != nil {
+		return LoginResponse{}, err
+	}
+
+	return LoginResponse{AuthURL: cfg.AuthCodeURL(state, oauth2.AccessTypeOffline), State: state}, nil
+}
+
+func (s *Service) Callback(ctx context.Context, provider, code string) (*AuthResponse, error) {
+	cfg, ok := s.providers[provider]
+	if !ok {
+		return nil, ErrInvalidProvider
+	}
+
+	token, err := cfg.Exchange(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+
+	profile, err := s.fetchProfile(ctx, provider, token)
+	if err != nil {
+		return nil, err
+	}
+
+	if profile.Email == "" {
+		return nil, errors.New("oauth provider did not return an email address")
+	}
+
+	name := strings.TrimSpace(profile.Name)
+	if name == "" {
+		name = strings.Split(profile.Email, "@")[0]
+	}
+
+	user := &models.User{Name: name, Email: profile.Email, Image: profile.Image}
+
+	if existing, findErr := s.repo.FindUserByProvider(ctx, provider, profile.ProviderAccountID); findErr == nil {
+		user = existing
+		if err := s.repo.db.WithContext(ctx).Model(user).Updates(map[string]any{"name": name, "image": profile.Image}).Error; err != nil {
+			return nil, err
+		}
+	} else if errors.Is(findErr, gorm.ErrRecordNotFound) {
+		if byEmail, emailErr := s.repo.FindUserByEmail(ctx, profile.Email); emailErr == nil {
+			user = byEmail
+			if err := s.repo.db.WithContext(ctx).Model(user).Updates(map[string]any{"name": name, "image": profile.Image}).Error; err != nil {
+				return nil, err
+			}
+		} else if !errors.Is(emailErr, gorm.ErrRecordNotFound) {
+			return nil, emailErr
+		}
+	} else {
+		return nil, findErr
+	}
+
+	account := &models.OAuthAccount{
+		Provider:          provider,
+		ProviderAccountID: profile.ProviderAccountID,
+		AccessToken:       profile.AccessToken,
+		RefreshToken:      profile.RefreshToken,
+	}
+	if profile.ExpiresAt != nil {
+		expiresAt := time.Unix(*profile.ExpiresAt, 0)
+		account.ExpiresAt = &expiresAt
+	}
+
+	if err := s.repo.UpsertUserWithAccount(ctx, user, account); err != nil {
+		return nil, err
+	}
+
+	tokenString, err := s.signJWT(user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AuthResponse{Token: tokenString, User: user}, nil
+}
+
+func (s *Service) Me(ctx context.Context, userID string) (*models.User, error) {
+	return s.repo.FindUserByID(ctx, userID)
+}
+
+func (s *Service) signJWT(user *models.User) (string, error) {
+	claims := jwt.MapClaims{
+		"sub":   user.ID,
+		"email": user.Email,
+		"name":  user.Name,
+		"exp":   time.Now().Add(24 * time.Hour).Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(s.cfg.JWTSecret))
+}
+
+func (s *Service) fetchProfile(ctx context.Context, provider string, token *oauth2.Token) (*ProviderProfile, error) {
+	client := oauth2.NewClient(ctx, oauth2.StaticTokenSource(token))
+
+	switch provider {
+	case string(ProviderGitHub):
+		return s.fetchGitHubProfile(ctx, client, token)
+	case string(ProviderGoogle):
+		return s.fetchGoogleProfile(ctx, client, token)
+	default:
+		return nil, ErrInvalidProvider
+	}
+}
+
+func (s *Service) fetchGitHubProfile(ctx context.Context, client *http.Client, token *oauth2.Token) (*ProviderProfile, error) {
+	var profile struct {
+		ID        int64  `json:"id"`
+		Name      string `json:"name"`
+		Login     string `json:"login"`
+		Email     string `json:"email"`
+		AvatarURL string `json:"avatar_url"`
+	}
+
+	if err := getJSON(ctx, client, "https://api.github.com/user", &profile); err != nil {
+		return nil, err
+	}
+
+	email := strings.TrimSpace(profile.Email)
+	if email == "" {
+		var emails []struct {
+			Email    string `json:"email"`
+			Primary  bool   `json:"primary"`
+			Verified bool   `json:"verified"`
+		}
+		if err := getJSON(ctx, client, "https://api.github.com/user/emails", &emails); err == nil {
+			for _, item := range emails {
+				if item.Primary && item.Verified {
+					email = item.Email
+					break
+				}
+			}
+		}
+	}
+
+	return &ProviderProfile{
+		ProviderAccountID: fmt.Sprintf("%d", profile.ID),
+		Name:              firstNonEmpty(profile.Name, profile.Login),
+		Email:             email,
+		Image:             profile.AvatarURL,
+		AccessToken:       token.AccessToken,
+		RefreshToken:      token.RefreshToken,
+		ExpiresAt:         tokenExpiryUnix(token),
+	}, nil
+}
+
+func (s *Service) fetchGoogleProfile(ctx context.Context, client *http.Client, token *oauth2.Token) (*ProviderProfile, error) {
+	var profile struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		Email   string `json:"email"`
+		Picture string `json:"picture"`
+	}
+
+	if err := getJSON(ctx, client, "https://www.googleapis.com/oauth2/v2/userinfo", &profile); err != nil {
+		return nil, err
+	}
+
+	return &ProviderProfile{
+		ProviderAccountID: profile.ID,
+		Name:              profile.Name,
+		Email:             profile.Email,
+		Image:             profile.Picture,
+		AccessToken:       token.AccessToken,
+		RefreshToken:      token.RefreshToken,
+		ExpiresAt:         tokenExpiryUnix(token),
+	}, nil
+}
+
+func randomState() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+
+	return base64.RawURLEncoding.EncodeToString(bytes), nil
+}
+
+func getJSON(ctx context.Context, client *http.Client, url string, out any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		body, _ := io.ReadAll(resp.Body)
+		return errors.New(strings.TrimSpace(string(body)))
+	}
+
+	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+
+	return ""
+}
+
+func tokenExpiryUnix(token *oauth2.Token) *int64 {
+	if token == nil || token.Expiry.IsZero() {
+		return nil
+	}
+
+	value := token.Expiry.Unix()
+	return &value
+}

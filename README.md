@@ -1,85 +1,61 @@
-# Openflag MVP
+# Openflag Go API Server
 
-Openflag is a developer + creator matching platform with a swipe-first experience.
+This repository now includes a Go API server that mirrors the data model from the Next.js app and keeps the code organized by feature.
 
-Core loop:
+## Structure
 
-1. Discover cards (users and projects)
-2. Evaluate quickly in-place
-3. Swipe right/left
-4. Create matches
+- `cmd/api` - executable entrypoint
+- `internal/config` - environment loading
+- `internal/database` - Gorm connection and migrations
+- `internal/modules/auth` - GitHub and Google OAuth login
+- `internal/modules/projects` - project CRUD
+- `internal/modules/posts` - post CRUD with project linking
+- `internal/modules/comments` - comment CRUD with post linking
+- `internal/middleware` - JWT auth guard
+- `internal/models` - shared Gorm models
 
-## Stack
+## API
 
-- Next.js App Router + TypeScript
-- Tailwind CSS v4
-- HeroUI v3
-- Better Auth (GitHub OAuth)
-- Prisma + PostgreSQL
-- TanStack Query (infinite feed)
-- Framer Motion (swipe interactions)
+Base path: `/api/v1`
 
-## Local Setup
+Auth:
 
-1. Copy [.env.example](.env.example) to `.env` and fill in values.
-2. Install deps:
+- `GET /auth/:provider/login`
+- `GET /auth/:provider/callback`
+- `GET /api/v1/me`
+- `POST /auth/logout`
+
+Projects:
+
+- `GET /projects`
+- `POST /projects`
+- `GET /projects/:id`
+- `PATCH /projects/:id`
+- `DELETE /projects/:id`
+
+Posts:
+
+- `GET /posts`
+- `POST /posts`
+- `GET /posts/:id`
+- `PATCH /posts/:id`
+- `DELETE /posts/:id`
+
+Comments:
+
+- `GET /posts/:postId/comments`
+- `POST /posts/:postId/comments`
+- `PATCH /comments/:id`
+- `DELETE /comments/:id`
+
+## Run
+
+1. Copy `.env.example` to `.env` and fill in the OAuth and database values.
+2. Start Postgres locally.
+3. Run the server:
 
 ```bash
-pnpm install
+go run ./cmd/api
 ```
 
-3. Generate Prisma client and run migrations:
-
-```bash
-pnpm prisma:generate
-pnpm prisma:migrate --name init
-```
-
-4. Seed demo data for the feed and match views:
-
-```bash
-pnpm prisma:seed
-```
-
-5. Run development server:
-
-```bash
-pnpm dev
-```
-
-## Auth + Onboarding
-
-- GitHub is the only sign-in provider.
-- First authenticated page load triggers GitHub profile/repo sync.
-- Only meaningful profile data is persisted:
-  - username, avatar, bio
-  - derived skills (from languages + topics)
-  - top repositories only
-
-## Matching Rules
-
-- `RIGHT` swipe on user creates interest.
-- User-user match is created when both users swipe `RIGHT`.
-- `RIGHT` swipe on project creates interest and auto-accepts in MVP.
-- Swipes are stored with unique constraints for idempotency.
-
-## Feed
-
-- Infinite card stack UI (not list-based).
-- Mixed user/project cards from one feed endpoint.
-- Cursor-based pagination.
-- Relevance scoring based on:
-  - skill overlap
-  - interest overlap
-  - recent activity bonus
-
-## Quality Constraints
-
-- Profile completion required before swiping.
-- Daily swipe limit on API.
-- Session swipe limit on client.
-
-## Manifesto Mode
-
-Set `OPENFLAG_MANIFESTO_MODE=true` to replace the swipe app with the manifesto landing page.
-In production, this mode keeps only the main manifesto page available and hides the product flow.
+The server listens on `PORT` and auto-migrates the schema on startup.

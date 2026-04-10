@@ -1,55 +1,9 @@
 {
-  "name": "openflag",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "node prisma/seed.mjs",
-    "prisma:studio": "prisma studio"
-  },
-  "prisma": {
-    "seed": "node prisma/seed.mjs"
-  },
-  "dependencies": {
-    "@heroicons/react": "^2.2.0",
-    "@hugeicons/core-free-icons": "^4.1.1",
-    "@hugeicons/react": "^1.1.6",
-    "@prisma/adapter-pg": "^7.7.0",
-    "@prisma/client": "^7.7.0",
-    "@prisma/client-runtime-utils": "^7.7.0",
-    "@tanstack/react-query": "^5.96.2",
-    "better-auth": "^1.6.0",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "embla-carousel-react": "^8.6.0",
-    "framer-motion": "^12.38.0",
-    "input-otp": "^1.4.2",
-    "lucide-react": "^1.8.0",
-    "next": "16.2.2",
-    "next-themes": "^0.4.6",
-    "radix-ui": "^1.4.3",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "sonner": "^2.0.7",
-    "tailwind-merge": "^3.5.0",
-    "tw-animate-css": "^1.4.0"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "babel-plugin-react-compiler": "1.0.0",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.2",
-    "prisma": "^7.7.0",
-    "shadcn": "^4.2.0",
-    "tailwindcss": "^4",
-    "typescript": "^5"
-  }
+	"dependencies": {
+		"@tanstack/react-query": "^5.97.0",
+		"react-hook-form": "^7.72.1",
+		"zod": "^4.3.6",
+		"@hookform/resolvers": "^5.2.2",
+		"react-router-dom": "^7.14.0"
+	}
 }
