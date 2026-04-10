@@ -9,13 +9,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
 	"openflag/internal/config"
 	"openflag/internal/models"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/lib/pq"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
 	"golang.org/x/oauth2/google"
@@ -23,6 +25,10 @@ import (
 )
 
 var ErrInvalidProvider = errors.New("invalid oauth provider")
+
+var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_\.]{3,30}$`)
+
+const sessionDuration = 24 * time.Hour
 
 type Service struct {
 	repo       *Repository
@@ -101,7 +107,14 @@ func (s *Service) Callback(ctx context.Context, provider, code string) (*AuthRes
 		name = strings.Split(profile.Email, "@")[0]
 	}
 
-	user := &models.User{Name: name, Email: profile.Email, Image: profile.Image}
+	usernameFromEmail := strings.Split(profile.Email, "@")[0] + "_" + randomString(6)
+
+	user := &models.User{
+		Name:     name,
+		Email:    profile.Email,
+		Image:    &profile.Image,
+		Username: usernameFromEmail,
+	}
 
 	if existing, findErr := s.repo.FindUserByProvider(ctx, provider, profile.ProviderAccountID); findErr == nil {
 		user = existing
@@ -136,7 +149,7 @@ func (s *Service) Callback(ctx context.Context, provider, code string) (*AuthRes
 		return nil, err
 	}
 
-	tokenString, err := s.signJWT(user)
+	tokenString, err := s.createSession(ctx, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -144,20 +157,162 @@ func (s *Service) Callback(ctx context.Context, provider, code string) (*AuthRes
 	return &AuthResponse{Token: tokenString, User: user}, nil
 }
 
+func (s *Service) Logout(ctx context.Context, token string) error {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil
+	}
+
+	return s.repo.RevokeSessionByToken(ctx, token)
+}
+
 func (s *Service) Me(ctx context.Context, userID string) (*models.User, error) {
 	return s.repo.FindUserByID(ctx, userID)
 }
 
-func (s *Service) signJWT(user *models.User) (string, error) {
-	claims := jwt.MapClaims{
-		"sub":   user.ID,
-		"email": user.Email,
-		"name":  user.Name,
-		"exp":   time.Now().Add(24 * time.Hour).Unix(),
+func (s *Service) Connections(ctx context.Context, userID string) (Connections, error) {
+	githubConnected, err := s.repo.HasProviderConnection(ctx, userID, string(ProviderGitHub))
+	if err != nil {
+		return Connections{}, err
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(s.cfg.JWTSecret))
+	wakatimeConnected, err := s.repo.HasProviderConnection(ctx, userID, string(ProviderWakaTime))
+	if err != nil {
+		return Connections{}, err
+	}
+
+	return Connections{
+		GitHubConnected:   githubConnected,
+		WakatimeConnected: wakatimeConnected,
+	}, nil
+}
+
+func (s *Service) CompleteOnboardingStep(ctx context.Context, userID string, input CompleteOnboardingStepRequest) (*MeResponse, error) {
+	if input.Step < 1 || input.Step > 3 {
+		return nil, errors.New("step must be between 1 and 3")
+	}
+
+	user, err := s.repo.FindUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	updates := map[string]any{}
+
+	switch input.Step {
+	case 1:
+		if input.Skip {
+			return nil, errors.New("step 1 is required")
+		}
+
+		username, bio, err := s.validateStepOne(ctx, user.ID, input)
+		if err != nil {
+			return nil, err
+		}
+
+		updates["username"] = username
+		updates["bio"] = bio
+		updates["skills"] = pq.StringArray(normalizeStringList(input.Skills))
+		updates["interests"] = pq.StringArray(normalizeStringList(input.Interests))
+	case 2:
+		if input.Availability != nil {
+			value := strings.TrimSpace(*input.Availability)
+			updates["availability"] = nullableString(value)
+		}
+		if input.LookingFor != nil {
+			value := strings.TrimSpace(*input.LookingFor)
+			updates["looking_for"] = nullableString(value)
+		}
+	case 3:
+		if input.WakatimeAPIKey != nil {
+			apiKey := strings.TrimSpace(*input.WakatimeAPIKey)
+			if apiKey != "" {
+				profile, err := s.fetchWakatimeProfile(ctx, apiKey)
+				if err != nil {
+					return nil, err
+				}
+
+				if err := s.repo.UpsertProviderConnection(ctx, &models.OAuthAccount{
+					UserID:            user.ID,
+					Provider:          string(ProviderWakaTime),
+					ProviderAccountID: profile.Data.ID,
+					AccessToken:       apiKey,
+					RefreshToken:      "",
+				}); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
+	nextState := min(user.OnboardState+1, 3)
+	updates["onboard_state"] = nextState
+
+	if err := s.repo.db.WithContext(ctx).Model(user).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+
+	updatedUser, err := s.repo.FindUserByID(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	connections, err := s.Connections(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MeResponse{User: updatedUser, Connections: connections}, nil
+}
+
+func (s *Service) validateStepOne(ctx context.Context, userID string, input CompleteOnboardingStepRequest) (string, string, error) {
+	if input.Username == nil || input.Bio == nil {
+		return "", "", errors.New("username and bio are required")
+	}
+
+	username := strings.TrimSpace(*input.Username)
+	bio := strings.TrimSpace(*input.Bio)
+
+	if username == "" || bio == "" {
+		return "", "", errors.New("username and bio are required")
+	}
+
+	if !usernamePattern.MatchString(username) {
+		return "", "", errors.New("username must be 3-30 chars and only letters, numbers, _ or .")
+	}
+
+	existing, err := s.repo.FindUserByUsername(ctx, username)
+	if err == nil && existing.ID != userID {
+		return "", "", errors.New("username is already taken")
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", "", err
+	}
+
+	return username, bio, nil
+}
+
+func (s *Service) createSession(ctx context.Context, userID string) (string, error) {
+	// IDK why I am doing this 3 times, but just in case of a random collision, we can retry a few times before giving up
+	// or for fun
+	for range 3 {
+		token, err := randomState()
+		if err != nil {
+			return "", err
+		}
+
+		session := &models.Session{
+			UserID:    userID,
+			Token:     token,
+			ExpiresAt: time.Now().Add(sessionDuration),
+		}
+
+		if err := s.repo.CreateSession(ctx, session); err == nil {
+			return token, nil
+		}
+	}
+
+	return "", errors.New("failed to create session")
 }
 
 func (s *Service) fetchProfile(ctx context.Context, provider string, token *oauth2.Token) (*ProviderProfile, error) {
@@ -284,4 +439,72 @@ func tokenExpiryUnix(token *oauth2.Token) *int64 {
 
 	value := token.Expiry.Unix()
 	return &value
+}
+
+type wakatimeCurrentUserResponse struct {
+	Data struct {
+		ID string `json:"id"`
+	} `json:"data"`
+}
+
+func (s *Service) fetchWakatimeProfile(ctx context.Context, apiKey string) (*wakatimeCurrentUserResponse, error) {
+	endpoint := "https://wakatime.com/api/v1/users/current?api_key=" + url.QueryEscape(apiKey)
+	var payload wakatimeCurrentUserResponse
+	if err := getJSON(ctx, s.httpClient, endpoint, &payload); err != nil {
+		return nil, errors.New("invalid wakatime api key")
+	}
+
+	if strings.TrimSpace(payload.Data.ID) == "" {
+		return nil, errors.New("invalid wakatime api key")
+	}
+
+	return &payload, nil
+}
+
+func nullableString(value string) any {
+	if value == "" {
+		return nil
+	}
+
+	return value
+}
+
+func normalizeStringList(input []string) []string {
+	if len(input) == 0 {
+		return []string{}
+	}
+
+	items := make([]string, 0, len(input))
+	seen := map[string]struct{}{}
+	for _, raw := range input {
+		value := strings.TrimSpace(raw)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		items = append(items, value)
+		if len(items) == 16 {
+			break
+		}
+	}
+
+	return items
+}
+
+func randomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		// skip randomization on error, fallback to timestamp-based string
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+
+	for i, b := range bytes {
+		bytes[i] = charset[b%byte(len(charset))]
+	}
+
+	return string(bytes)
 }

@@ -62,9 +62,10 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 		}
 
 		protected := api.Group("")
-		protected.Use(middleware.RequireAuth(cfg, authRepo))
+		protected.Use(middleware.RequireAuth(authRepo))
 		{
 			protected.GET("/me", authController.Me)
+			protected.POST("/me/onboarding/step", authController.CompleteOnboardingStep)
 			protected.GET("/projects", projectController.List)
 			protected.POST("/projects", projectController.Create)
 			protected.GET("/projects/:id", projectController.Get)

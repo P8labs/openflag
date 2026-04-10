@@ -48,8 +48,8 @@ func (s *Service) Create(ctx context.Context, ownerID string, input CreateReques
 		OwnerID:     ownerID,
 		Title:       title,
 		Description: description,
-		GitHubURL:   strings.TrimSpace(input.GitHubURL),
-		WakatimeID:  strings.TrimSpace(input.WakatimeID),
+		GitHubURL:   stringPtr(strings.TrimSpace(input.GitHubURL)),
+		WakatimeIDs: input.WakatimeIDs,
 		Tags:        normalizeTags(input.Tags),
 	}
 
@@ -149,4 +149,11 @@ func normalizeTags(input []string) []string {
 	}
 
 	return tags
+}
+
+func stringPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

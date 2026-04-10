@@ -67,14 +67,14 @@ func (s *Service) Create(ctx context.Context, authorID string, input CreateReque
 	}
 
 	post := &models.Post{
-		AuthorID:   authorID,
-		Content:    content,
-		Image:      strings.TrimSpace(input.Image),
-		GitHubURL:  strings.TrimSpace(input.GitHubURL),
-		PRURL:      strings.TrimSpace(input.PRURL),
-		IssueURL:   strings.TrimSpace(input.IssueURL),
-		WakatimeID: strings.TrimSpace(input.WakatimeID),
-		ProjectID:  nil,
+		AuthorID:    authorID,
+		Content:     content,
+		Image:       input.Image,
+		GitHubURL:   input.GitHubURL,
+		PRURL:       input.PRURL,
+		IssueURL:    input.IssueURL,
+		WakatimeIDs: input.WakatimeIDs,
+		ProjectID:   nil,
 	}
 	if projectID != "" {
 		post.ProjectID = &projectID
@@ -115,8 +115,8 @@ func (s *Service) Update(ctx context.Context, id string, authorID string, input 
 	if input.IssueURL != nil {
 		updates["issue_url"] = strings.TrimSpace(*input.IssueURL)
 	}
-	if input.WakatimeID != nil {
-		updates["wakatime_id"] = strings.TrimSpace(*input.WakatimeID)
+	if input.WakatimeIDs != nil {
+		updates["wakatime_ids"] = input.WakatimeIDs
 	}
 	if input.ProjectID != nil {
 		projectID := strings.TrimSpace(*input.ProjectID)

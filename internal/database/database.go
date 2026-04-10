@@ -21,8 +21,14 @@ func Open(cfg config.Config) (*gorm.DB, error) {
 }
 
 func Migrate(db *gorm.DB) error {
+	// db.Exec(`
+	// 	DROP SCHEMA public CASCADE;
+	// 	CREATE SCHEMA public;
+	// `)
+
 	return db.AutoMigrate(
 		&models.User{},
+		&models.Session{},
 		&models.OAuthAccount{},
 		&models.Project{},
 		&models.Post{},

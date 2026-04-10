@@ -4,7 +4,7 @@ type CreateRequest struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 	GitHubURL   string   `json:"githubUrl"`
-	WakatimeID  string   `json:"wakatimeId"`
+	WakatimeIDs []string `json:"wakatimeIds"`
 	Tags        []string `json:"tags"`
 }
 

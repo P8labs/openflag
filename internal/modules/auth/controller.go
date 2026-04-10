@@ -63,12 +63,72 @@ func (ctl *Controller) Me(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusOK, gin.H{"user": user})
+	connections, err := ctl.service.Connections(c.Request.Context(), userID.(string))
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, MeResponse{User: user, Connections: connections})
+}
+
+func (ctl *Controller) CompleteOnboardingStep(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var input CompleteOnboardingStepRequest
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	result, err := ctl.service.CompleteOnboardingStep(c.Request.Context(), userID.(string), input)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, result)
 }
 
 func (ctl *Controller) Logout(c *gin.Context) {
+	token := ""
+	if cookie, err := c.Cookie("openflag_token"); err == nil {
+		token = cookie
+	}
+
+	if token == "" {
+		token = bearerToken(c)
+	}
+
+	if err := ctl.service.Logout(c.Request.Context(), token); err != nil {
+		response.Fail(c, http.StatusInternalServerError, "failed to logout")
+		return
+	}
+
 	ctl.clearCookies(c)
 	response.Success(c, http.StatusOK, gin.H{"success": true})
+}
+
+func bearerToken(c *gin.Context) string {
+	authorization := strings.TrimSpace(c.GetHeader("Authorization"))
+	if authorization == "" {
+		return ""
+	}
+
+	parts := strings.Fields(authorization)
+	if len(parts) != 2 {
+		return ""
+	}
+
+	if !strings.EqualFold(parts[0], "Bearer") {
+		return ""
+	}
+
+	return parts[1]
 }
 
 func (ctl *Controller) setAuthCookie(c *gin.Context, token string) {

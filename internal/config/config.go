@@ -11,7 +11,6 @@ import (
 type Config struct {
 	Port               string
 	DatabaseURL        string
-	JWTSecret          string
 	BaseURL            string
 	FrontendURL        string
 	GitHubClientID     string
@@ -28,7 +27,6 @@ func Load() Config {
 	cfg := Config{
 		Port:               getEnv("PORT", "8080"),
 		DatabaseURL:        os.Getenv("DATABASE_URL"),
-		JWTSecret:          os.Getenv("JWT_SECRET"),
 		BaseURL:            getEnv("BASE_URL", "http://localhost:8080"),
 		FrontendURL:        getEnv("FRONTEND_URL", "http://localhost:5173"),
 		GitHubClientID:     os.Getenv("GITHUB_CLIENT_ID"),
@@ -37,10 +35,6 @@ func Load() Config {
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		CookieDomain:       strings.TrimSpace(os.Getenv("COOKIE_DOMAIN")),
 		Environment:        getEnv("ENVIRONMENT", "development"),
-	}
-
-	if cfg.JWTSecret == "" {
-		cfg.JWTSecret = "change-me-in-production"
 	}
 
 	if cfg.DatabaseURL == "" {

@@ -1,19 +1,16 @@
 package middleware
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
-	"openflag/internal/config"
 	authmodule "openflag/internal/modules/auth"
 	"openflag/internal/response"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
-func RequireAuth(cfg config.Config, repo *authmodule.Repository) gin.HandlerFunc {
+func RequireAuth(repo *authmodule.Repository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := bearerToken(c)
 		if token == "" {
@@ -28,42 +25,15 @@ func RequireAuth(cfg config.Config, repo *authmodule.Repository) gin.HandlerFunc
 			return
 		}
 
-		parsed, err := jwt.Parse(token, func(parsed *jwt.Token) (any, error) {
-			if _, ok := parsed.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, errors.New("unexpected signing method")
-			}
-
-			return []byte(cfg.JWTSecret), nil
-		})
-		if err != nil || !parsed.Valid {
+		session, err := repo.FindValidSessionByToken(c.Request.Context(), token)
+		if err != nil {
 			response.Fail(c, http.StatusUnauthorized, "invalid token")
 			c.Abort()
 			return
 		}
 
-		claims, ok := parsed.Claims.(jwt.MapClaims)
-		if !ok {
-			response.Fail(c, http.StatusUnauthorized, "invalid token claims")
-			c.Abort()
-			return
-		}
-
-		userID, _ := claims["sub"].(string)
-		if userID == "" {
-			response.Fail(c, http.StatusUnauthorized, "invalid token subject")
-			c.Abort()
-			return
-		}
-
-		user, err := repo.FindUserByID(c.Request.Context(), userID)
-		if err != nil {
-			response.Fail(c, http.StatusUnauthorized, "user not found")
-			c.Abort()
-			return
-		}
-
-		c.Set("user_id", user.ID)
-		c.Set("current_user", user)
+		c.Set("user_id", session.UserID)
+		c.Set("current_user", &session.User)
 		c.Next()
 	}
 }
