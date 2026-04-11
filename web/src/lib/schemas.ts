@@ -33,6 +33,7 @@ export const createProjectComposerSchema = z.object({
   summary: z.string().trim().min(8, "A short summary is required."),
   description: z.string().trim().min(20, "Description is too short."),
   status: z.enum(projectStatuses).default("dev"),
+  logoUrl: z.string().trim().min(1, "Logo URL is required.").default("?"),
   projectUrl: z.string().trim().url().optional().or(z.literal("")),
   githubUrl: z.string().trim().url().optional().or(z.literal("")),
   imageUrl: z.string().trim().url().optional().or(z.literal("")),

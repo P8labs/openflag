@@ -76,6 +76,7 @@ export default function CreateProjectPage() {
       title: "",
       summary: "",
       description: "",
+      logoUrl: "?",
       projectUrl: "",
       githubUrl: "",
       imageUrl: "",
@@ -132,6 +133,7 @@ export default function CreateProjectPage() {
           summary: formValues.summary.trim(),
           description: formValues.description.trim(),
           status: formValues.status,
+          logoUrl: formValues.logoUrl?.trim() || "?",
           projectUrl,
           imageUrl,
           videoUrl,
@@ -330,6 +332,20 @@ export default function CreateProjectPage() {
 
         <section className="space-y-4 border-b border-border pb-5">
           <p className="text-sm font-medium">Links and media</p>
+
+          <label className="block space-y-2">
+            <Label htmlFor="logoUrl">Logo URL *</Label>
+            <Input
+              id="logoUrl"
+              {...form.register("logoUrl")}
+              placeholder="https://cdn.example.com/logo.png"
+            />
+            {form.formState.errors.logoUrl ? (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.logoUrl.message}
+              </p>
+            ) : null}
+          </label>
 
           <label className="block space-y-2">
             <Label htmlFor="projectUrl">Project URL</Label>

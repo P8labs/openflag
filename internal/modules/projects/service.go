@@ -89,6 +89,7 @@ func (s *Service) Create(ctx context.Context, ownerID string, input CreateReques
 		Status:      status,
 		Description: description,
 		Summary:     summary,
+		LogoURL:     stringPtr(normalizeLogoURL(input.LogoURL)),
 		Url:         stringPtr(strings.TrimSpace(input.ProjectURL)),
 		Image:       stringPtr(strings.TrimSpace(input.ImageURL)),
 		Video:       stringPtr(strings.TrimSpace(input.VideoURL)),
@@ -120,6 +121,9 @@ func (s *Service) Update(ctx context.Context, id string, ownerID string, input U
 		return nil, err
 	}
 	setNonEmptyTrimmed(updates, "description", input.Description)
+	if input.LogoURL != nil {
+		updates["logo_url"] = normalizeLogoURL(*input.LogoURL)
+	}
 	setNullableTrimmed(updates, "url", input.ProjectURL)
 	setNullableTrimmed(updates, "image", firstProvided(input.ImageURL, input.Image))
 	setNullableTrimmed(updates, "video", firstProvided(input.VideoURL, input.Video))
@@ -294,6 +298,15 @@ func stringPtr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+func normalizeLogoURL(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "?"
+	}
+
+	return trimmed
 }
 
 func nullableString(s string) any {

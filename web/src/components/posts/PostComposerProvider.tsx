@@ -51,7 +51,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { cn } from "@/lib/utils";
+import { cn, formatDuration } from "@/lib/utils";
 
 type ComposerState = {
   open: boolean;
@@ -246,22 +246,6 @@ function refDisplayLabel(type: string, url: string) {
   }
 }
 
-function formatDuration(minutes: number) {
-  const safeMinutes = Math.max(0, Math.floor(minutes));
-  const hours = Math.floor(safeMinutes / 60);
-  const mins = safeMinutes % 60;
-
-  if (hours === 0) {
-    return `${mins}m`;
-  }
-
-  if (mins === 0) {
-    return `${hours}h`;
-  }
-
-  return `${hours}h ${mins}m`;
-}
-
 function buildAskQuizPayload(content: string, options: string[]) {
   const trimmedQuestion = content.trim();
   const normalizedOptions = options
@@ -290,12 +274,15 @@ function PostComposerModal({
   state: ComposerState;
   onClose: () => void;
 }) {
+  const ANIMATION_MS = 180;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [projectSearch, setProjectSearch] = useState("");
   const [imageOpen, setImageOpen] = useState(false);
   const [quizOptions, setQuizOptions] = useState(["", "", "", ""]);
+  const [shouldRender, setShouldRender] = useState(state.open);
+  const [isClosing, setIsClosing] = useState(false);
 
   const projectsQuery = useQuery({
     queryKey: ["projects"],
@@ -482,6 +469,25 @@ function PostComposerModal({
     }
   }
 
+  useEffect(() => {
+    if (!state.open) {
+      return;
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [state.open, state.returnTo, navigate]);
+
   function selectCategory(category: CreatePostComposerValues["category"]) {
     form.setValue("category", category, {
       shouldDirty: true,
@@ -560,15 +566,49 @@ function PostComposerModal({
     setProjectPickerOpen(false);
   }
 
-  if (!state.open) {
+  useEffect(() => {
+    if (state.open) {
+      setShouldRender(true);
+      setIsClosing(false);
+      return;
+    }
+
+    if (!shouldRender) {
+      return;
+    }
+
+    setIsClosing(true);
+    const timeout = window.setTimeout(() => {
+      setShouldRender(false);
+      setIsClosing(false);
+    }, ANIMATION_MS);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [state.open, shouldRender]);
+
+  if (!shouldRender) {
     return null;
   }
 
   const currentCategory = values.category;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl rounded-md border border-border bg-background p-4 shadow-lg">
+    <div
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px] transition-opacity duration-200",
+        isClosing ? "opacity-0" : "opacity-100",
+      )}
+    >
+      <div
+        className={cn(
+          "w-full max-w-2xl rounded-md border border-border bg-background p-4 shadow-lg transition-all duration-200",
+          isClosing
+            ? "translate-y-1 scale-[0.99] opacity-0"
+            : "translate-y-0 scale-100 opacity-100",
+        )}
+      >
         <div className="mb-4 flex items-start justify-between gap-3 border-b border-border pb-3">
           <div className="space-y-1">
             <h2 className="text-xl font-semibold leading-tight">

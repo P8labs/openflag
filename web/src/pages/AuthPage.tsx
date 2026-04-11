@@ -37,7 +37,7 @@ export default function AuthPage() {
           <Button
             size="lg"
             variant="outline"
-            className="w-full rounded-md rounded-t-none h-18 text-xl space-x-1 flex justify-between items-center px-6 font-mono bg-white hover:bg-gray-100 transition-colors border border-t-0"
+            className="w-full rounded-md rounded-t-none h-18 text-xl space-x-1 flex justify-between items-center px-6 font-mono bg-white! hover:bg-gray-100! text-black! transition-colors border border-t-0"
             onClick={() => loginWithProvider("google")}
           >
             Continue with Google

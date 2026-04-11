@@ -205,6 +205,36 @@ func (s *Service) Delete(ctx context.Context, id string, authorID string) error 
 	return s.repo.Delete(ctx, id)
 }
 
+func (s *Service) ToggleLike(ctx context.Context, id string, userID string) (*models.Post, bool, error) {
+	if _, err := s.repo.FindByID(ctx, id); err != nil {
+		return nil, false, mapPostErr(err)
+	}
+
+	hasLiked, err := s.repo.HasUserLiked(ctx, id, userID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	liked := false
+	if hasLiked {
+		if err := s.repo.RemoveLike(ctx, id, userID); err != nil {
+			return nil, false, err
+		}
+	} else {
+		if err := s.repo.AddLike(ctx, id, userID); err != nil {
+			return nil, false, err
+		}
+		liked = true
+	}
+
+	post, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, false, mapPostErr(err)
+	}
+
+	return post, liked, nil
+}
+
 func mapPostErr(err error) error {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrPostNotFound

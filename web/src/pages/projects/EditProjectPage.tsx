@@ -33,6 +33,7 @@ type ProjectDetail = {
   title: string;
   summary: string;
   description: string;
+  logoUrl?: string | null;
   status?: string;
   url?: string | null;
   image?: string | null;
@@ -82,6 +83,7 @@ export default function EditProjectPage() {
       title: "",
       summary: "",
       description: "",
+      logoUrl: "?",
       status: "dev",
       projectUrl: "",
       githubUrl: "",
@@ -103,6 +105,7 @@ export default function EditProjectPage() {
       title: project.title,
       summary: project.summary,
       description: project.description,
+      logoUrl: project.logoUrl ?? "?",
       status: normalizeProjectStatus(project.status),
       projectUrl: project.url ?? "",
       githubUrl: project.githubUrl ?? "",
@@ -136,6 +139,7 @@ export default function EditProjectPage() {
             summary: payload.summary.trim(),
             description: payload.description.trim(),
             status: payload.status,
+            logoUrl: payload.logoUrl?.trim() || "?",
             projectUrl: payload.projectUrl?.trim() || "",
             imageUrl: payload.imageUrl?.trim() || "",
             videoUrl: payload.videoUrl?.trim() || "",
@@ -286,6 +290,16 @@ export default function EditProjectPage() {
 
         <section className="space-y-4 border-b border-border pb-5">
           <p className="text-sm font-medium">Links and media</p>
+
+          <label className="block space-y-2">
+            <Label htmlFor="logoUrl">Logo URL *</Label>
+            <Input id="logoUrl" {...form.register("logoUrl")} />
+            {form.formState.errors.logoUrl ? (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.logoUrl.message}
+              </p>
+            ) : null}
+          </label>
 
           <label className="block space-y-2">
             <Label htmlFor="projectUrl">Project URL</Label>

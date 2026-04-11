@@ -22,3 +22,8 @@ type UpdateRequest struct {
 	WakatimeIDs []string `json:"wakatimeIds"`
 	ProjectID   *string  `json:"projectId"`
 }
+
+type LikeToggleResponse struct {
+	Post  any  `json:"post"`
+	Liked bool `json:"liked"`
+}

@@ -21,6 +21,8 @@ func (r *Repository) List(ctx context.Context) ([]models.Post, error) {
 	if err := r.db.WithContext(ctx).
 		Preload("Author").
 		Preload("Project").
+		Preload("Likes").
+		Preload("Comments").
 		Order("created_at desc").
 		Find(&posts).Error; err != nil {
 		return nil, err
@@ -34,6 +36,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*models.Post, err
 	if err := r.db.WithContext(ctx).
 		Preload("Author").
 		Preload("Project").
+		Preload("Likes").
 		Preload("Comments").
 		First(&post, "id = ?", id).Error; err != nil {
 		return nil, err
@@ -71,4 +74,29 @@ func (r *Repository) SumLoggedDevlogMinutesByProject(ctx context.Context, projec
 	}
 
 	return total, nil
+}
+
+func (r *Repository) HasUserLiked(ctx context.Context, postID, userID string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Table("post_likes").
+		Where("post_id = ? AND user_id = ?", postID, userID).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
+func (r *Repository) AddLike(ctx context.Context, postID, userID string) error {
+	post := &models.Post{ID: postID}
+	user := &models.User{ID: userID}
+	return r.db.WithContext(ctx).Model(post).Association("Likes").Append(user)
+}
+
+func (r *Repository) RemoveLike(ctx context.Context, postID, userID string) error {
+	post := &models.Post{ID: postID}
+	user := &models.User{ID: userID}
+	return r.db.WithContext(ctx).Model(post).Association("Likes").Delete(user)
 }

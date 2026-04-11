@@ -78,6 +78,7 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 			protected.GET("/posts", postController.List)
 			protected.POST("/posts", postController.Create)
 			protected.GET("/posts/:id", postController.Get)
+			protected.POST("/posts/:id/like", postController.ToggleLike)
 			protected.PATCH("/posts/:id", postController.Update)
 			protected.DELETE("/posts/:id", postController.Delete)
 

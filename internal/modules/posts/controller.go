@@ -94,3 +94,17 @@ func (ctl *Controller) Delete(c *gin.Context) {
 
 	response.Success(c, http.StatusOK, gin.H{"success": true})
 }
+
+func (ctl *Controller) ToggleLike(c *gin.Context) {
+	post, liked, err := ctl.service.ToggleLike(c.Request.Context(), c.Param("id"), c.GetString("user_id"))
+	if err != nil {
+		status := http.StatusBadRequest
+		if err == ErrPostNotFound {
+			status = http.StatusNotFound
+		}
+		response.Fail(c, status, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, gin.H{"post": post, "liked": liked})
+}

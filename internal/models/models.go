@@ -91,6 +91,7 @@ type Project struct {
 	Status      string         `gorm:"type:text;not null;default:'dev'" json:"status"`
 	Summary     string         `gorm:"type:text;not null" json:"summary"`
 	Description string         `gorm:"type:text;not null" json:"description"`
+	LogoURL     *string        `json:"logoUrl"`
 	Url         *string        `json:"url,omitempty"`
 	Image       *string        `json:"image,omitempty"`
 	Video       *string        `json:"video,omitempty"`

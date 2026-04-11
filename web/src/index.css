@@ -124,7 +124,8 @@
   } */
 
   html {
-    @apply font-sans;
+    @apply font-sans scroll-smooth;
+    scrollbar-width: thin;
   }
 
   body {

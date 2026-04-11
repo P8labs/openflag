@@ -5,6 +5,7 @@ type CreateRequest struct {
 	Status      string   `json:"status"`
 	Description string   `json:"description"`
 	Summary     string   `json:"summary"`
+	LogoURL     string   `json:"logoUrl"`
 	ProjectURL  string   `json:"projectUrl"`
 	ImageURL    string   `json:"imageUrl"`
 	VideoURL    string   `json:"videoUrl"`
@@ -17,6 +18,7 @@ type UpdateRequest struct {
 	Title       *string   `json:"title"`
 	Status      *string   `json:"status"`
 	Description *string   `json:"description"`
+	LogoURL     *string   `json:"logoUrl"`
 	ProjectURL  *string   `json:"projectUrl"`
 	Image       *string   `json:"image"`
 	ImageURL    *string   `json:"imageUrl"`
