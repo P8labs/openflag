@@ -2,8 +2,10 @@ package posts
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
+	"time"
 
 	"openflag/internal/models"
 	projectsmodule "openflag/internal/modules/projects"
@@ -40,8 +42,24 @@ func NewService(repo *Repository, projectAccess projectLookup, db *gorm.DB) *Ser
 	return &Service{repo: repo, projectAccess: projectAccess, db: db}
 }
 
-func (s *Service) List(ctx context.Context) ([]models.Post, error) {
-	return s.repo.List(ctx)
+func (s *Service) List(ctx context.Context, userID string, limit int, offset int) ([]models.Post, bool, error) {
+	posts, hasMore, err := s.repo.List(ctx, limit, offset)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if userID == "" {
+		return posts, hasMore, nil
+	}
+
+	for index := range posts {
+		vote, voteErr := s.repo.FindQuizVoteByUser(ctx, posts[index].ID, userID)
+		if voteErr == nil {
+			posts[index].MyQuizVote = vote
+		}
+	}
+
+	return posts, hasMore, nil
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*models.Post, error) {
@@ -117,6 +135,10 @@ func (s *Service) Create(ctx context.Context, authorID string, input CreateReque
 	}
 
 	if err := s.repo.Create(ctx, post); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.IncrementUserActivity(ctx, authorID, time.Now()); err != nil {
 		return nil, err
 	}
 
@@ -233,6 +255,50 @@ func (s *Service) ToggleLike(ctx context.Context, id string, userID string) (*mo
 	}
 
 	return post, liked, nil
+}
+
+func (s *Service) VoteQuiz(ctx context.Context, postID string, userID string, optionIndex int) (*models.Post, error) {
+	post, err := s.repo.FindByID(ctx, postID)
+	if err != nil {
+		return nil, mapPostErr(err)
+	}
+
+	if post.Quiz == nil || strings.TrimSpace(*post.Quiz) == "" {
+		return nil, errors.New("quiz not available")
+	}
+
+	if _, err := s.repo.FindQuizVoteByUser(ctx, postID, userID); err == nil {
+		return nil, errors.New("you have already voted")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	if optionIndex < 0 {
+		return nil, errors.New("invalid option")
+	}
+
+	var quizPayload struct {
+		Type    string   `json:"type"`
+		Options []string `json:"options"`
+	}
+	if err := json.Unmarshal([]byte(*post.Quiz), &quizPayload); err != nil {
+		return nil, errors.New("invalid quiz payload")
+	}
+	if quizPayload.Type != "mcq" {
+		return nil, errors.New("quiz is not an mcq")
+	}
+	if optionIndex >= len(quizPayload.Options) {
+		return nil, errors.New("invalid option")
+	}
+
+	if err := s.repo.CreateQuizVote(ctx, &models.PostQuizVote{PostID: postID, UserID: userID, OptionIndex: optionIndex}); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
+			return nil, errors.New("you have already voted")
+		}
+		return nil, err
+	}
+
+	return s.repo.FindByID(ctx, postID)
 }
 
 func mapPostErr(err error) error {

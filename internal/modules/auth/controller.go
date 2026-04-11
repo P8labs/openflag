@@ -72,6 +72,32 @@ func (ctl *Controller) Me(c *gin.Context) {
 	response.Success(c, http.StatusOK, MeResponse{User: user, Connections: connections})
 }
 
+func (ctl *Controller) Activity(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	summary, err := ctl.service.ActivitySummary(c.Request.Context(), userID.(string), 84)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, summary)
+}
+
+func (ctl *Controller) PublicProfile(c *gin.Context) {
+	profile, err := ctl.service.PublicProfile(c.Request.Context(), c.Param("username"))
+	if err != nil {
+		response.Fail(c, http.StatusNotFound, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, profile)
+}
+
 func (ctl *Controller) CompleteOnboardingStep(c *gin.Context) {
 	userID, ok := c.Get("user_id")
 	if !ok {

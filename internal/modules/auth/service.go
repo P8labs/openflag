@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -45,7 +46,7 @@ func NewService(repo *Repository, cfg config.Config) *Service {
 			ClientID:     cfg.GitHubClientID,
 			ClientSecret: cfg.GitHubClientSecret,
 			RedirectURL:  fmt.Sprintf("%s/api/v1/auth/github/callback", strings.TrimRight(cfg.BaseURL, "/")),
-			Scopes:       []string{"read:user", "user:email"},
+			Scopes:       []string{"read:user", "user:email", "public_repo"},
 			Endpoint:     github.Endpoint,
 		}
 	}
@@ -168,6 +169,157 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 
 func (s *Service) Me(ctx context.Context, userID string) (*models.User, error) {
 	return s.repo.FindUserByID(ctx, userID)
+}
+
+func (s *Service) ActivitySummary(ctx context.Context, userID string, days int) (*ActivitySummaryResponse, error) {
+	if days <= 0 {
+		days = 84
+	}
+
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	since := today.AddDate(0, 0, -(days - 1))
+
+	activities, err := s.repo.ListUserActivitiesSince(ctx, userID, since)
+	if err != nil {
+		return nil, err
+	}
+
+	activityMap := map[string]int{}
+	for _, day := range activities {
+		key := day.ActivityDate.UTC().Format("2006-01-02")
+		activityMap[key] = day.Count
+	}
+
+	response := &ActivitySummaryResponse{
+		Days: make([]ActivityDay, 0, days),
+	}
+
+	for i := 0; i < days; i++ {
+		date := since.AddDate(0, 0, i)
+		key := date.Format("2006-01-02")
+		response.Days = append(response.Days, ActivityDay{Date: key, Count: activityMap[key]})
+	}
+
+	response.CurrentStreak, response.LongestStreak = computeStreaks(response.Days)
+
+	return response, nil
+}
+
+func (s *Service) PublicProfile(ctx context.Context, username string) (*PublicUserProfileResponse, error) {
+	user, err := s.repo.FindUserByUsername(ctx, strings.TrimSpace(username))
+	if err != nil {
+		return nil, err
+	}
+
+	projects, err := s.repo.ListRecentProjectsByOwner(ctx, user.ID, 6)
+	if err != nil {
+		return nil, err
+	}
+
+	posts, err := s.repo.ListRecentPostsByAuthor(ctx, user.ID, 8)
+	if err != nil {
+		return nil, err
+	}
+
+	totalTracked, err := s.repo.SumTrackedMinutesByUser(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	activity, err := s.ActivitySummary(ctx, user.ID, 84)
+	if err != nil {
+		return nil, err
+	}
+
+	profile := &PublicUserProfileResponse{
+		CurrentStreak:    activity.CurrentStreak,
+		LongestStreak:    activity.LongestStreak,
+		TotalTrackedMins: totalTracked,
+		RecentProjects:   make([]PublicProjectSummary, 0, len(projects)),
+		RecentPosts:      make([]PublicPostSummary, 0, len(posts)),
+		ActivityDays:     activity.Days,
+	}
+
+	profile.User.ID = user.ID
+	profile.User.Name = user.Name
+	profile.User.Username = user.Username
+	profile.User.Image = user.Image
+	profile.User.Bio = user.Bio
+	profile.User.Skills = []string(user.Skills)
+	profile.User.Interests = []string(user.Interests)
+	profile.User.Availability = user.Availability
+	profile.User.LookingFor = user.LookingFor
+
+	for _, project := range projects {
+		logo := "?"
+		if project.LogoURL != nil && strings.TrimSpace(*project.LogoURL) != "" {
+			logo = *project.LogoURL
+		}
+		profile.RecentProjects = append(profile.RecentProjects, PublicProjectSummary{
+			ID:        project.ID,
+			Title:     project.Title,
+			Summary:   project.Summary,
+			Status:    project.Status,
+			LogoURL:   logo,
+			CreatedAt: project.CreatedAt.UTC().Format(time.RFC3339),
+		})
+	}
+
+	for _, post := range posts {
+		var projectID *string
+		var projectTitle *string
+		if post.Project != nil {
+			projectID = &post.Project.ID
+			projectTitle = &post.Project.Title
+		}
+
+		profile.RecentPosts = append(profile.RecentPosts, PublicPostSummary{
+			ID:            post.ID,
+			Content:       post.Content,
+			Category:      post.Category,
+			CreatedAt:     post.CreatedAt.UTC().Format(time.RFC3339),
+			DevlogMinutes: post.DevlogMinutes,
+			ProjectID:     projectID,
+			ProjectTitle:  projectTitle,
+			RefURLs:       []string(post.RefURLs),
+		})
+	}
+
+	return profile, nil
+}
+
+func computeStreaks(days []ActivityDay) (int, int) {
+	if len(days) == 0 {
+		return 0, 0
+	}
+
+	copyDays := append([]ActivityDay(nil), days...)
+	sort.Slice(copyDays, func(i, j int) bool {
+		return copyDays[i].Date < copyDays[j].Date
+	})
+
+	longest := 0
+	running := 0
+	for _, day := range copyDays {
+		if day.Count > 0 {
+			running++
+			if running > longest {
+				longest = running
+			}
+		} else {
+			running = 0
+		}
+	}
+
+	current := 0
+	for index := len(copyDays) - 1; index >= 0; index-- {
+		if copyDays[index].Count <= 0 {
+			break
+		}
+		current++
+	}
+
+	return current, longest
 }
 
 func (s *Service) Connections(ctx context.Context, userID string) (Connections, error) {

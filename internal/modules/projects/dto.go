@@ -25,7 +25,7 @@ type UpdateRequest struct {
 	Video       *string   `json:"video"`
 	VideoURL    *string   `json:"videoUrl"`
 	GitHubURL   *string   `json:"githubUrl"`
-	WakatimeID  *string   `json:"wakatimeId"`
+	WakatimeIDs *[]string `json:"wakatimeIds"`
 	Tags        *[]string `json:"tags"`
 }
 

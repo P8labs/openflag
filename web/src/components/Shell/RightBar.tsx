@@ -1,8 +1,17 @@
 import { useAuth } from "@/context/auth-context";
+import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { loginWithProvider } from "@/context/auth-context";
+import { apiFetch } from "@/lib/api";
+import { Link } from "react-router-dom";
+
+type ActivityResponse = {
+  currentStreak: number;
+  longestStreak: number;
+  days: Array<{ date: string; count: number }>;
+};
 
 export default function RightBar() {
   return (
@@ -14,6 +23,11 @@ export default function RightBar() {
 
 function ProfileCard() {
   const { user, connections } = useAuth();
+  const activityQuery = useQuery({
+    queryKey: ["me-activity"],
+    queryFn: () => apiFetch<ActivityResponse>("/api/v1/me/activity"),
+    staleTime: 60_000,
+  });
 
   if (!user) return null;
 
@@ -45,13 +59,51 @@ function ProfileCard() {
 
             <div className="flex flex-col leading-tight">
               <span className="font-medium">{user.name}</span>
-              <span className="text-xs text-muted-foreground">
+              <Link
+                to={`/${user.username}`}
+                className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+              >
                 @{user.username}
-              </span>
+              </Link>
             </div>
           </div>
         </div>
       </header>
+
+      <div className="space-y-3 border-t border-border pt-4">
+        <div className="flex items-center justify-between">
+          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+            Streak
+          </p>
+          <span className="text-xs text-muted-foreground">
+            {activityQuery.data?.currentStreak ?? 0}d
+          </span>
+        </div>
+
+        <div className="grid grid-cols-12 gap-1">
+          {(activityQuery.data?.days ?? []).slice(-84).map((day) => (
+            <span
+              key={day.date}
+              title={`${day.date} • ${day.count} posts`}
+              className={
+                day.count >= 4
+                  ? "h-2.5 w-2.5 rounded-sm bg-primary"
+                  : day.count === 3
+                    ? "h-2.5 w-2.5 rounded-sm bg-primary/90"
+                    : day.count === 2
+                      ? "h-2.5 w-2.5 rounded-sm bg-primary/80"
+                      : day.count === 1
+                        ? "h-2.5 w-2.5 rounded-sm bg-primary/70"
+                        : "h-2.5 w-2.5 rounded-sm bg-muted"
+              }
+            />
+          ))}
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Longest streak: {activityQuery.data?.longestStreak ?? 0}d
+        </p>
+      </div>
 
       <div className="space-y-2 border-t border-border pt-4">
         <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">

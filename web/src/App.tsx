@@ -12,6 +12,7 @@ import {
   NotFoundPage,
   OnboardPage,
   ProjectDetailPage,
+  UserProfilePage,
 } from "./pages";
 
 import { AppShell } from "@/components/AppShell";
@@ -38,23 +39,24 @@ export default function App() {
             <Route path="/onboard" element={<OnboardPage />} />
             <Route path="/app" element={<AppShell />}>
               <Route index element={<HomePage />} />
-              <Route path="/app/projects" element={<ManageProjectsPage />} />
+              <Route path="projects" element={<ManageProjectsPage />} />
+              <Route path="projects/compose" element={<CreateProjectPage />} />
               <Route
-                path="/app/projects/compose"
-                element={<CreateProjectPage />}
-              />
-              <Route
-                path="/app/projects/:projectId"
+                path="projects/:projectId"
                 element={<ProjectDetailPage />}
               />
               <Route
-                path="/app/projects/:projectId/edit"
+                path="projects/:projectId/edit"
                 element={<EditProjectPage />}
               />
-              <Route path="/app/posts/compose" element={<CreatePostPage />} />
-              <Route path="/app/explore" element={<ExplorePage />} />
-              <Route path="/app/galaxy" element={<GalaxyPage />} />
+              <Route path="posts/compose" element={<CreatePostPage />} />
+              <Route path="explore" element={<ExplorePage />} />
+              <Route path="galaxy" element={<GalaxyPage />} />
             </Route>
+            <Route path=":username" element={<AppShell />}>
+              <Route index element={<UserProfilePage />} />
+            </Route>
+
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </AuthGate>

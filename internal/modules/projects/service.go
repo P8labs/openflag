@@ -57,8 +57,8 @@ func NewService(repo *Repository, db *gorm.DB) *Service {
 	}
 }
 
-func (s *Service) List(ctx context.Context) ([]models.Project, error) {
-	return s.repo.List(ctx)
+func (s *Service) List(ctx context.Context, limit int, offset int) ([]models.Project, bool, error) {
+	return s.repo.List(ctx, limit, offset)
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*models.Project, error) {
@@ -127,8 +127,10 @@ func (s *Service) Update(ctx context.Context, id string, ownerID string, input U
 	setNullableTrimmed(updates, "url", input.ProjectURL)
 	setNullableTrimmed(updates, "image", firstProvided(input.ImageURL, input.Image))
 	setNullableTrimmed(updates, "video", firstProvided(input.VideoURL, input.Video))
-	setNullableTrimmed(updates, "github_url", input.GitHubURL)
-	setNullableTrimmed(updates, "wakatime_id", input.WakatimeID)
+	setNullableTrimmed(updates, "githubUrl", input.GitHubURL)
+	if input.WakatimeIDs != nil {
+		updates["wakatime_ids"] = input.WakatimeIDs
+	}
 	if input.Tags != nil {
 		updates["tags"] = normalizeTags(*input.Tags)
 	}
@@ -258,6 +260,44 @@ func (s *Service) GitHubReferences(ctx context.Context, userID string, repoURL s
 	}
 
 	return refs, nil
+}
+
+func (s *Service) StarGitHubProject(ctx context.Context, userID string, projectID string) error {
+	project, err := s.repo.FindByID(ctx, projectID)
+	if err != nil {
+		return mapProjectErr(err)
+	}
+
+	if project.GitHubURL == nil || strings.TrimSpace(*project.GitHubURL) == "" {
+		return errors.New("project does not have a github repository")
+	}
+
+	owner, repo, err := parseGitHubRepo(*project.GitHubURL)
+	if err != nil {
+		return err
+	}
+
+	var account models.OAuthAccount
+	if err := s.db.WithContext(ctx).
+		First(&account, "user_id = ? AND provider = ?", userID, "github").
+		Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("github is not connected")
+		}
+		return err
+	}
+
+	token := strings.TrimSpace(account.AccessToken)
+	if token == "" {
+		return errors.New("github access token is missing")
+	}
+
+	endpoint := fmt.Sprintf("https://api.github.com/user/starred/%s/%s", url.PathEscape(owner), url.PathEscape(repo))
+	if err := putGitHubNoContent(ctx, s.httpClient, endpoint, token); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func mapProjectErr(err error) error {
@@ -491,6 +531,30 @@ func getGitHubJSON(ctx context.Context, client *http.Client, requestURL string, 
 	}
 
 	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+func putGitHubNoContent(ctx context.Context, client *http.Client, requestURL string, accessToken string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, requestURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	req.Header.Set("Content-Length", "0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("github api error: %s", strings.TrimSpace(string(body)))
+	}
+
+	return nil
 }
 
 func parseGitHubRepo(repoURL string) (string, string, error) {

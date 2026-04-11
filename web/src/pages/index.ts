@@ -9,3 +9,4 @@ export { default as ProjectDetailPage } from "./projects/ProjectDetailPage";
 export { default as EditProjectPage } from "./projects/EditProjectPage";
 export { default as CreateProjectPage } from "./projects/CreateProjectPage";
 export { default as CreatePostPage } from "./posts/CreatePostPage";
+export { default as UserProfilePage } from "./UserProfilePage";

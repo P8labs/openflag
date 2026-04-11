@@ -7,6 +7,7 @@ import {
   Compass,
   FolderKanban,
   Home,
+  LogOutIcon,
   Settings,
   Sparkles,
   SquarePen,
@@ -24,6 +25,7 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import { usePostComposer } from "../posts/PostComposerProvider";
+import { useAuth } from "@/context/auth-context";
 
 const navItems = [
   { label: "Home", to: "/app", icon: Home },
@@ -33,9 +35,10 @@ const navItems = [
 ] as const;
 
 export default function LeftBar() {
-  const location = useLocation();
+  const { signOut } = useAuth();
+  // const location = useLocation();
   const { openComposer } = usePostComposer();
-  const isSettingsActive = location.pathname.startsWith("/app/settings");
+  // const isSettingsActive = location.pathname.startsWith("/app/settings");
 
   return (
     <nav className="lg:min-w-50 border rounded-l-md border-secondary bg-secondary/20 p-2 fixed md:sticky top-0 h-[calc(100vh-1rem)] overflow-hidden">
@@ -65,12 +68,18 @@ export default function LeftBar() {
           </div>
 
           <div className="border-t border-border pt-4 flex flex-col gap-2">
-            <IconNavItem
+            <ActionNavItem
+              label="Sign Out"
+              danger
+              icon={LogOutIcon}
+              onClick={() => signOut()}
+            />
+            {/* <IconNavItem
               to="/app/settings"
               label="Settings"
               icon={Settings}
               forceActive={isSettingsActive}
-            />
+            /> */}
             <ThemeToggle variant="label" />
           </div>
         </div>
@@ -126,9 +135,11 @@ function ActionNavItem({
   label,
   icon: Icon,
   onClick,
+  danger = false,
 }: {
   label: string;
   icon: LucideIcon;
+  danger?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -137,14 +148,15 @@ function ActionNavItem({
         <Button
           asChild
           type="button"
-          variant="ghost"
+          variant={danger ? "destructive" : "ghost"}
           onClick={onClick}
           className="rounded-full lg:rounded-md border border-transparent w-full"
         >
           <div
             className={cn(
-              "flex size-11 h-10 justify-start gap-3 rounded-lg border transition-colors",
-              "text-foreground border-border hover:bg-accent hover:text-accent-foreground",
+              "flex size-11 h-10 justify-start gap-3 rounded-lg border",
+              !danger &&
+                "text-foreground border-border hover:bg-accent hover:text-accent-foreground transition-colors",
             )}
           >
             <Icon className="size-5 shrink-0" />

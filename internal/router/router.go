@@ -26,7 +26,7 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{cfg.BaseURL, "http://localhost:3000", "http://localhost:5173"},
+		AllowOrigins:     []string{cfg.BaseURL, cfg.FrontendURL, "http://localhost:3000", "http://localhost:5173", "http://localhost:4173"},
 		AllowMethods:     []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		AllowCredentials: true,
@@ -65,12 +65,15 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 		protected.Use(middleware.RequireAuth(authRepo))
 		{
 			protected.GET("/me", authController.Me)
+			protected.GET("/me/activity", authController.Activity)
+			protected.GET("/users/:username/profile", authController.PublicProfile)
 			protected.GET("/me/wakatime/projects", authController.WakaTimeProjects)
 			protected.POST("/me/onboarding/step", authController.CompleteOnboardingStep)
 			protected.GET("/projects", projectController.List)
 			protected.POST("/projects", projectController.Create)
 			protected.GET("/projects/:id", projectController.Get)
 			protected.GET("/projects/:id/tracked-time", projectController.TrackedTime)
+			protected.POST("/projects/:id/star", projectController.Star)
 			protected.GET("/projects/github/references", projectController.GitHubReferences)
 			protected.PATCH("/projects/:id", projectController.Update)
 			protected.DELETE("/projects/:id", projectController.Delete)
@@ -79,6 +82,7 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 			protected.POST("/posts", postController.Create)
 			protected.GET("/posts/:id", postController.Get)
 			protected.POST("/posts/:id/like", postController.ToggleLike)
+			protected.POST("/posts/:id/quiz-vote", postController.VoteQuiz)
 			protected.PATCH("/posts/:id", postController.Update)
 			protected.DELETE("/posts/:id", postController.Delete)
 

@@ -2,6 +2,7 @@ package posts
 
 import (
 	"context"
+	"time"
 
 	"openflag/internal/models"
 
@@ -16,19 +17,31 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) List(ctx context.Context) ([]models.Post, error) {
+func (r *Repository) List(ctx context.Context, limit int, offset int) ([]models.Post, bool, error) {
 	var posts []models.Post
-	if err := r.db.WithContext(ctx).
+	query := r.db.WithContext(ctx).
 		Preload("Author").
 		Preload("Project").
 		Preload("Likes").
+		Preload("QuizVotes").
 		Preload("Comments").
-		Order("created_at desc").
-		Find(&posts).Error; err != nil {
-		return nil, err
+		Order("created_at desc")
+
+	hasMore := false
+	if limit > 0 {
+		query = query.Offset(offset).Limit(limit + 1)
 	}
 
-	return posts, nil
+	if err := query.Find(&posts).Error; err != nil {
+		return nil, false, err
+	}
+
+	if limit > 0 && len(posts) > limit {
+		hasMore = true
+		posts = posts[:limit]
+	}
+
+	return posts, hasMore, nil
 }
 
 func (r *Repository) FindByID(ctx context.Context, id string) (*models.Post, error) {
@@ -37,6 +50,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*models.Post, err
 		Preload("Author").
 		Preload("Project").
 		Preload("Likes").
+		Preload("QuizVotes").
 		Preload("Comments").
 		First(&post, "id = ?", id).Error; err != nil {
 		return nil, err
@@ -99,4 +113,40 @@ func (r *Repository) RemoveLike(ctx context.Context, postID, userID string) erro
 	post := &models.Post{ID: postID}
 	user := &models.User{ID: userID}
 	return r.db.WithContext(ctx).Model(post).Association("Likes").Delete(user)
+}
+
+func (r *Repository) IncrementUserActivity(ctx context.Context, userID string, day time.Time) error {
+	activityDate := day.UTC().Truncate(24 * time.Hour)
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var activity models.UserActivity
+		err := tx.Where("user_id = ? AND activity_date = ?", userID, activityDate).First(&activity).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return tx.Create(&models.UserActivity{
+					UserID:       userID,
+					ActivityDate: activityDate,
+					Count:        1,
+				}).Error
+			}
+			return err
+		}
+
+		return tx.Model(&models.UserActivity{}).
+			Where("id = ?", activity.ID).
+			Update("count", gorm.Expr("count + 1")).Error
+	})
+}
+
+func (r *Repository) FindQuizVoteByUser(ctx context.Context, postID, userID string) (*models.PostQuizVote, error) {
+	var vote models.PostQuizVote
+	if err := r.db.WithContext(ctx).
+		First(&vote, "post_id = ? AND user_id = ?", postID, userID).Error; err != nil {
+		return nil, err
+	}
+
+	return &vote, nil
+}
+
+func (r *Repository) CreateQuizVote(ctx context.Context, vote *models.PostQuizVote) error {
+	return r.db.WithContext(ctx).Create(vote).Error
 }

@@ -16,16 +16,27 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) List(ctx context.Context) ([]models.Project, error) {
+func (r *Repository) List(ctx context.Context, limit int, offset int) ([]models.Project, bool, error) {
 	var projects []models.Project
-	if err := r.db.WithContext(ctx).
+	query := r.db.WithContext(ctx).
 		Preload("Owner").
-		Order("created_at desc").
-		Find(&projects).Error; err != nil {
-		return nil, err
+		Order("created_at desc")
+
+	hasMore := false
+	if limit > 0 {
+		query = query.Offset(offset).Limit(limit + 1)
 	}
 
-	return projects, nil
+	if err := query.Find(&projects).Error; err != nil {
+		return nil, false, err
+	}
+
+	if limit > 0 && len(projects) > limit {
+		hasMore = true
+		projects = projects[:limit]
+	}
+
+	return projects, hasMore, nil
 }
 
 func (r *Repository) FindByID(ctx context.Context, id string) (*models.Project, error) {

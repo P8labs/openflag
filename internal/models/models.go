@@ -28,6 +28,7 @@ type User struct {
 	Projects []Project      `gorm:"foreignKey:OwnerID;references:ID" json:"projects,omitempty"`
 	Posts    []Post         `gorm:"foreignKey:AuthorID;references:ID" json:"posts,omitempty"`
 	Comments []PostComment  `gorm:"foreignKey:UserID;references:ID" json:"comments,omitempty"`
+	Activity []UserActivity `gorm:"foreignKey:UserID;references:ID" json:"activity,omitempty"`
 
 	LikedPosts []Post `gorm:"many2many:post_likes;constraint:OnDelete:CASCADE;" json:"likedPosts,omitempty"`
 
@@ -122,6 +123,8 @@ type Post struct {
 	Category      string         `gorm:"type:text;not null;default:'devlog'" json:"category"`
 	DevlogMinutes *int           `json:"devlogMinutes,omitempty"`
 	Quiz          *string        `gorm:"type:text" json:"quiz,omitempty"`
+	QuizVotes     []PostQuizVote `gorm:"foreignKey:PostID;references:ID" json:"quizVotes,omitempty"`
+	MyQuizVote    *PostQuizVote  `gorm:"-" json:"myQuizVote,omitempty"`
 	Image         *string        `json:"image,omitempty"`
 	GitHubURL     *string        `json:"githubUrl"`
 	RefURLs       pq.StringArray `gorm:"type:text[];default:'{}'" json:"refUrls"`
@@ -160,6 +163,45 @@ type PostComment struct {
 func (c *PostComment) BeforeCreate(_ *gorm.DB) error {
 	if c.ID == "" {
 		c.ID = uuid.NewString()
+	}
+
+	return nil
+}
+
+type PostQuizVote struct {
+	ID          string    `gorm:"primaryKey;size:36" json:"id"`
+	PostID      string    `gorm:"index:idx_post_quiz_vote,unique;not null" json:"postId"`
+	UserID      string    `gorm:"index:idx_post_quiz_vote,unique;not null" json:"userId"`
+	OptionIndex int       `gorm:"not null" json:"optionIndex"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+
+	Post Post `gorm:"foreignKey:PostID;references:ID;constraint:OnDelete:CASCADE;" json:"post,omitempty"`
+	User User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE;" json:"user,omitempty"`
+}
+
+func (v *PostQuizVote) BeforeCreate(_ *gorm.DB) error {
+	if v.ID == "" {
+		v.ID = uuid.NewString()
+	}
+
+	return nil
+}
+
+type UserActivity struct {
+	ID           string    `gorm:"primaryKey;size:36" json:"id"`
+	UserID       string    `gorm:"index:idx_user_activity_date,unique;not null" json:"userId"`
+	ActivityDate time.Time `gorm:"type:date;index:idx_user_activity_date,unique;not null" json:"activityDate"`
+	Count        int       `gorm:"not null;default:0" json:"count"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+
+	User User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE;" json:"user"`
+}
+
+func (a *UserActivity) BeforeCreate(_ *gorm.DB) error {
+	if a.ID == "" {
+		a.ID = uuid.NewString()
 	}
 
 	return nil

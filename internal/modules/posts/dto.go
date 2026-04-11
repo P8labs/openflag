@@ -27,3 +27,7 @@ type LikeToggleResponse struct {
 	Post  any  `json:"post"`
 	Liked bool `json:"liked"`
 }
+
+type QuizVoteRequest struct {
+	OptionIndex int `json:"optionIndex"`
+}

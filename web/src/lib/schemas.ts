@@ -69,7 +69,11 @@ export const postCategories = [
 ] as const;
 
 export const createPostComposerSchema = z.object({
-  content: z.string().trim().min(2, "Post content is required."),
+  content: z
+    .string()
+    .trim()
+    .min(2, "Post content is required.")
+    .max(5000, "Post content is too long."),
   category: z.enum(postCategories).default("devlog"),
   projectId: z.string().trim().optional().or(z.literal("")),
   quiz: z.string().trim().optional().or(z.literal("")),

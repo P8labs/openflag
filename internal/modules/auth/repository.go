@@ -141,3 +141,61 @@ func (r *Repository) RevokeSessionByToken(ctx context.Context, token string) err
 		Update("revoked_at", now).
 		Error
 }
+
+func (r *Repository) ListUserActivitiesSince(ctx context.Context, userID string, since time.Time) ([]models.UserActivity, error) {
+	var days []models.UserActivity
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND activity_date >= ?", userID, since).
+		Order("activity_date asc").
+		Find(&days).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return days, nil
+}
+
+func (r *Repository) ListRecentProjectsByOwner(ctx context.Context, ownerID string, limit int) ([]models.Project, error) {
+	var projects []models.Project
+	query := r.db.WithContext(ctx).
+		Where("owner_id = ?", ownerID).
+		Order("created_at desc")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if err := query.Find(&projects).Error; err != nil {
+		return nil, err
+	}
+
+	return projects, nil
+}
+
+func (r *Repository) ListRecentPostsByAuthor(ctx context.Context, authorID string, limit int) ([]models.Post, error) {
+	var posts []models.Post
+	query := r.db.WithContext(ctx).
+		Preload("Project").
+		Where("author_id = ?", authorID).
+		Order("created_at desc")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if err := query.Find(&posts).Error; err != nil {
+		return nil, err
+	}
+
+	return posts, nil
+}
+
+func (r *Repository) SumTrackedMinutesByUser(ctx context.Context, userID string) (int, error) {
+	var total int
+	err := r.db.WithContext(ctx).
+		Model(&models.Post{}).
+		Select("COALESCE(SUM(devlog_minutes), 0)").
+		Where("author_id = ?", userID).
+		Scan(&total).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return total, nil
+}

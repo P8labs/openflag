@@ -343,20 +343,6 @@ export default function ProjectDetailPage() {
         <p className="text-sm leading-relaxed text-muted-foreground">
           {project.description}
         </p>
-
-        {project.url ? (
-          <p className="text-sm text-muted-foreground">
-            Project URL:{" "}
-            <a
-              href={project.url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary hover:underline"
-            >
-              {project.url}
-            </a>
-          </p>
-        ) : null}
       </section>
 
       {isOwner ? (

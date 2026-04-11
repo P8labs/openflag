@@ -1,6 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleDot, GitMerge, Heart, Link2, MessageCircle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+  CircleDot,
+  GitMerge,
+  Heart,
+  Link2,
+  MessageCircle,
+  CheckCircle2,
+  Star,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { usePostComposer } from "@/components/posts/PostComposerProvider";
@@ -18,6 +31,9 @@ type FeedProject = {
   title: string;
   summary: string;
   logoUrl?: string | null;
+  image?: string | null;
+  video?: string | null;
+  githubUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   status?: string;
@@ -34,6 +50,8 @@ type FeedPost = {
   content: string;
   category?: string;
   quiz?: string | null;
+  quizVotes?: Array<{ userId: string; optionIndex: number }>;
+  myQuizVote?: { userId: string; optionIndex: number } | null;
   refUrls?: string[];
   devlogMinutes?: number;
   createdAt: string;
@@ -197,6 +215,31 @@ function quizSummary(quiz?: string | null) {
   return "Quiz";
 }
 
+function parseQuizOptions(quiz?: string | null) {
+  if (!quiz) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(quiz) as {
+      type?: string;
+      question?: string;
+      options?: string[];
+    };
+
+    if (parsed?.type !== "mcq" || !Array.isArray(parsed.options)) {
+      return null;
+    }
+
+    return {
+      question: parsed.question ?? "Quiz",
+      options: parsed.options,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function PostComments({
   postId,
   onCountChange,
@@ -301,52 +344,123 @@ function PostComments({
 }
 
 export default function HomePage() {
+  const HOME_POSTS_QUERY_KEY = ["home-feed", "posts"] as const;
+  const HOME_PROJECTS_QUERY_KEY = ["home-feed", "projects"] as const;
   const { openComposer } = usePostComposer();
-  const { user } = useAuth();
+  const { user, connections } = useAuth();
   const [commentPanel, setCommentPanel] = useState<Record<string, boolean>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>(
     {},
   );
+  const [starredProjects, setStarredProjects] = useState<
+    Record<string, boolean>
+  >({});
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const queryClient = useQueryClient();
+  const PAGE_SIZE_POSTS = 12;
+  const PAGE_SIZE_PROJECTS = 8;
 
-  const postsQuery = useQuery({
-    queryKey: ["posts"],
-    queryFn: () => apiFetch<{ posts: FeedPost[] }>("/api/v1/posts"),
+  const postsQuery = useInfiniteQuery({
+    queryKey: HOME_POSTS_QUERY_KEY,
+    queryFn: ({ pageParam }) =>
+      apiFetch<{ posts: FeedPost[]; hasMore: boolean; nextOffset: number }>(
+        `/api/v1/posts?limit=${PAGE_SIZE_POSTS}&offset=${pageParam}`,
+      ),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? lastPage.nextOffset : undefined,
     staleTime: 30_000,
   });
 
-  const projectsQuery = useQuery({
-    queryKey: ["projects"],
-    queryFn: () => apiFetch<{ projects: FeedProject[] }>("/api/v1/projects"),
+  const projectsQuery = useInfiniteQuery({
+    queryKey: HOME_PROJECTS_QUERY_KEY,
+    queryFn: ({ pageParam }) =>
+      apiFetch<{
+        projects: FeedProject[];
+        hasMore: boolean;
+        nextOffset: number;
+      }>(`/api/v1/projects?limit=${PAGE_SIZE_PROJECTS}&offset=${pageParam}`),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? lastPage.nextOffset : undefined,
     staleTime: 30_000,
   });
+
+  const posts = useMemo(
+    () => postsQuery.data?.pages.flatMap((page) => page.posts) ?? [],
+    [postsQuery.data?.pages],
+  );
+
+  const projects = useMemo(
+    () => projectsQuery.data?.pages.flatMap((page) => page.projects) ?? [],
+    [projectsQuery.data?.pages],
+  );
 
   const feed = useMemo<FeedItem[]>(() => {
-    const postItems: FeedItem[] = (postsQuery.data?.posts ?? []).map(
-      (post) => ({
-        type: "post",
-        id: `post-${post.id}`,
-        createdAt: post.createdAt,
-        post,
-      }),
-    );
+    const postItems: FeedItem[] = posts.map((post) => ({
+      type: "post",
+      id: `post-${post.id}`,
+      createdAt: post.createdAt,
+      post,
+    }));
 
-    const projectItems: FeedItem[] = (projectsQuery.data?.projects ?? []).map(
-      (project) => ({
-        type: "project",
-        id: `project-${project.id}`,
-        createdAt: project.createdAt,
-        project,
-      }),
-    );
+    const projectItems: FeedItem[] = projects.map((project) => ({
+      type: "project",
+      id: `project-${project.id}`,
+      createdAt: project.createdAt,
+      project,
+    }));
 
     return [...postItems, ...projectItems].sort((a, b) => {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-  }, [postsQuery.data?.posts, projectsQuery.data?.projects]);
+  }, [posts, projects]);
 
   const isLoading = postsQuery.isLoading || projectsQuery.isLoading;
   const hasError = postsQuery.isError || projectsQuery.isError;
+  const canLoadMore =
+    Boolean(postsQuery.hasNextPage) || Boolean(projectsQuery.hasNextPage);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !canLoadMore) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting) {
+          return;
+        }
+
+        if (postsQuery.hasNextPage && !postsQuery.isFetchingNextPage) {
+          void postsQuery.fetchNextPage();
+        }
+
+        if (projectsQuery.hasNextPage && !projectsQuery.isFetchingNextPage) {
+          void projectsQuery.fetchNextPage();
+        }
+      },
+      {
+        rootMargin: "300px 0px",
+      },
+    );
+
+    observer.observe(node);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    canLoadMore,
+    postsQuery.fetchNextPage,
+    postsQuery.hasNextPage,
+    postsQuery.isFetchingNextPage,
+    projectsQuery.fetchNextPage,
+    projectsQuery.hasNextPage,
+    projectsQuery.isFetchingNextPage,
+  ]);
 
   const likeMutation = useMutation({
     mutationFn: (postID: string) =>
@@ -357,7 +471,37 @@ export default function HomePage() {
         },
       ),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["posts"] });
+      await queryClient.invalidateQueries({ queryKey: HOME_POSTS_QUERY_KEY });
+    },
+  });
+
+  const quizVoteMutation = useMutation({
+    mutationFn: ({
+      postID,
+      optionIndex,
+    }: {
+      postID: string;
+      optionIndex: number;
+    }) =>
+      apiFetch<{ post: FeedPost }>(`/api/v1/posts/${postID}/quiz-vote`, {
+        method: "POST",
+        body: JSON.stringify({ optionIndex }),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: HOME_POSTS_QUERY_KEY });
+    },
+  });
+
+  const starProjectMutation = useMutation({
+    mutationFn: (projectID: string) =>
+      apiFetch<{ starred: boolean }>(`/api/v1/projects/${projectID}/star`, {
+        method: "POST",
+      }),
+    onSuccess: (_data, projectID) => {
+      setStarredProjects((current) => ({
+        ...current,
+        [projectID]: true,
+      }));
     },
   });
 
@@ -418,8 +562,14 @@ export default function HomePage() {
             {feed.map((item) => {
               if (item.type === "project") {
                 const project = item.project;
+                const mediaPreview = project.image ?? project.video;
+                const hasMediaPreview = Boolean(mediaPreview);
+                const canStarProject = Boolean(
+                  connections.githubConnected && project.githubUrl,
+                );
+                const projectStarred = Boolean(starredProjects[project.id]);
                 return (
-                  <li key={item.id} className="space-y-2 py-4">
+                  <li key={item.id} className="space-y-3 py-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
                         <Avatar className="mt-0.5 size-10 border border-border">
@@ -438,9 +588,12 @@ export default function HomePage() {
                             <span className="font-medium text-foreground">
                               {project.owner?.name ?? "Unknown"}
                             </span>
-                            <span className="text-muted-foreground">
+                            <Link
+                              to={`/${project.owner?.username ?? "user"}`}
+                              className="text-muted-foreground hover:text-foreground hover:underline"
+                            >
                               @{project.owner?.username ?? "user"}
-                            </span>
+                            </Link>
                           </div>
 
                           <Link
@@ -452,16 +605,62 @@ export default function HomePage() {
                           <p className="text-sm text-muted-foreground">
                             {project.summary}
                           </p>
+
+                          {hasMediaPreview ? (
+                            <div className="mt-2 overflow-hidden rounded-md border border-border bg-background/40">
+                              {project.image ? (
+                                <img
+                                  src={project.image}
+                                  alt={`${project.title} media preview`}
+                                  className="h-44 w-full object-cover"
+                                />
+                              ) : (
+                                <video
+                                  src={project.video ?? undefined}
+                                  className="h-44 w-full object-cover"
+                                  controls
+                                  preload="metadata"
+                                />
+                              )}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 
-                      <div className="flex shrink-0 items-center gap-2 text-xs">
+                      <div className="flex shrink-0 flex-col items-end gap-2 text-xs">
                         <Badge variant="outline">
                           {projectStatusLabel(project.status)}
                         </Badge>
                         <span className="text-muted-foreground">
                           {timeLabel(project.createdAt)}
                         </span>
+                        {canStarProject ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              starProjectMutation.mutate(project.id)
+                            }
+                            disabled={
+                              projectStarred ||
+                              (starProjectMutation.isPending &&
+                                starProjectMutation.variables === project.id)
+                            }
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors",
+                              projectStarred
+                                ? "border-yellow-300 bg-yellow-500/10 text-yellow-700"
+                                : "border-border text-muted-foreground hover:text-foreground",
+                            )}
+                          >
+                            <Star
+                              className={cn(
+                                "size-3.5",
+                                projectStarred && "fill-current",
+                              )}
+                            />
+                            {projectStarred ? "Starred" : "Star"}
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                     {(project.tags ?? []).length > 0 ? (
@@ -476,6 +675,14 @@ export default function HomePage() {
                           </Badge>
                         ))}
                       </div>
+                    ) : null}
+                    {starProjectMutation.isError &&
+                    starProjectMutation.variables === project.id ? (
+                      <p className="text-xs text-destructive">
+                        {starProjectMutation.error instanceof Error
+                          ? starProjectMutation.error.message
+                          : "Unable to star this project."}
+                      </p>
                     ) : null}
                   </li>
                 );
@@ -496,6 +703,14 @@ export default function HomePage() {
                 shouldAutoOpenComments(post.id, commentCount);
               const refs = post.refUrls ?? [];
               const quizLabel = quizSummary(post.quiz);
+              const quizOptions = parseQuizOptions(post.quiz);
+              const quizVoteCounts =
+                quizOptions?.options.map((_, optionIndex) => {
+                  return (post.quizVotes ?? []).filter(
+                    (vote) => vote.optionIndex === optionIndex,
+                  ).length;
+                }) ?? [];
+              const myQuizVote = post.myQuizVote ?? null;
 
               return (
                 <li key={item.id} className="space-y-3 py-4">
@@ -521,7 +736,12 @@ export default function HomePage() {
                           {post.author?.name ?? "Unknown"}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
-                          @{post.author?.username ?? "user"}
+                          <Link
+                            to={`/${post.author?.username ?? "user"}`}
+                            className="hover:text-foreground hover:underline"
+                          >
+                            @{post.author?.username ?? "user"}
+                          </Link>
                         </p>
                       </div>
                     </div>
@@ -537,6 +757,92 @@ export default function HomePage() {
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                     {post.content}
                   </p>
+
+                  {quizOptions ? (
+                    <section className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Pick one option. Voting is locked after submit.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="first:rounded-t-md">
+                        {quizOptions.options.map((option, optionIndex) => {
+                          const count = quizVoteCounts[optionIndex] ?? 0;
+                          const selected =
+                            myQuizVote?.optionIndex === optionIndex;
+                          const totalVotes = quizVoteCounts.reduce(
+                            (sum, value) => sum + value,
+                            0,
+                          );
+                          const percentage =
+                            totalVotes > 0
+                              ? Math.round((count / totalVotes) * 100)
+                              : 0;
+
+                          return (
+                            <button
+                              key={`${post.id}-quiz-${optionIndex}`}
+                              type="button"
+                              disabled={
+                                Boolean(myQuizVote) ||
+                                quizVoteMutation.isPending
+                              }
+                              onClick={() =>
+                                quizVoteMutation.mutate({
+                                  postID: post.id,
+                                  optionIndex,
+                                })
+                              }
+                              className={cn(
+                                "w-full border px-3 py-2 text-left transition-colors rounded-none first:rounded-t-md last:rounded-b-md",
+                                selected
+                                  ? "border-primary/20 bg-primary/10"
+                                  : "border-border bg-background hover:border-primary/40 hover:bg-primary/5",
+                                myQuizVote && !selected && "opacity-70",
+                              )}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2">
+                                  {selected ? (
+                                    <CheckCircle2 className="size-4 text-primary" />
+                                  ) : (
+                                    <span className="size-4 rounded-full border border-border" />
+                                  )}
+                                  <span className="text-sm text-foreground">
+                                    {option}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {count} · {percentage}%
+                                </span>
+                              </div>
+
+                              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                                <div
+                                  className={cn(
+                                    "h-full rounded-full bg-primary transition-all",
+                                    selected && "bg-primary",
+                                  )}
+                                  style={{ width: `${percentage}%` }}
+                                />
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {quizVoteMutation.isError ? (
+                        <p className="text-xs text-destructive">
+                          {quizVoteMutation.error instanceof Error
+                            ? quizVoteMutation.error.message
+                            : "Unable to submit vote."}
+                        </p>
+                      ) : null}
+                    </section>
+                  ) : null}
 
                   {refs.length > 0 ||
                   typeof post.devlogMinutes === "number" ||
@@ -570,11 +876,6 @@ export default function HomePage() {
                       {typeof post.devlogMinutes === "number" ? (
                         <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5">
                           Tracked {formatDuration(post.devlogMinutes)}
-                        </span>
-                      ) : null}
-                      {quizLabel ? (
-                        <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5">
-                          {quizLabel}
                         </span>
                       ) : null}
                     </div>
@@ -631,10 +932,16 @@ export default function HomePage() {
                     <PostComments
                       postId={post.id}
                       onCountChange={(count) =>
-                        setCommentCounts((current) => ({
-                          ...current,
-                          [post.id]: count,
-                        }))
+                        setCommentCounts((current) => {
+                          if (current[post.id] === count) {
+                            return current;
+                          }
+
+                          return {
+                            ...current,
+                            [post.id]: count,
+                          };
+                        })
                       }
                     />
                   ) : null}
@@ -642,6 +949,15 @@ export default function HomePage() {
               );
             })}
           </ul>
+        ) : null}
+
+        {!isLoading && !hasError && canLoadMore ? (
+          <div
+            ref={loadMoreRef}
+            className="py-4 text-center text-xs text-muted-foreground"
+          >
+            Loading more updates...
+          </div>
         ) : null}
       </section>
     </section>

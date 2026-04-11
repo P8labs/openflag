@@ -441,7 +441,7 @@ export function OnboardStepForm() {
               onboardingMutation.isPending || (step === 1 && !canSubmitStepOne)
             }
             size="lg"
-            className="w-full rounded-md bg-black hover:bg-black/80 transition-colors text-white hover:text-white/90 h-12 text-base space-x-1 flex justify-center items-center px-6 font-mono border-0"
+            className="w-full rounded-md h-12"
           >
             {submitLabel}
           </Button>
