@@ -57,3 +57,18 @@ func (r *Repository) Update(ctx context.Context, id string, updates map[string]a
 func (r *Repository) Delete(ctx context.Context, id string) error {
 	return r.db.WithContext(ctx).Delete(&models.Post{}, "id = ?", id).Error
 }
+
+func (r *Repository) SumLoggedDevlogMinutesByProject(ctx context.Context, projectID string) (int, error) {
+	var total int
+	err := r.db.WithContext(ctx).
+		Model(&models.Post{}).
+		Select("COALESCE(SUM(devlog_minutes), 0)").
+		Where("project_id = ? AND category = ?", projectID, "devlog").
+		Scan(&total).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return total, nil
+}

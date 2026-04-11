@@ -5,3 +5,7 @@ export { default as OnboardPage } from "./OnboardPage";
 export { default as NotFoundPage } from "./misc/NotFoundPage";
 export { default as HomePage } from "./HomePage";
 export { default as ManageProjectsPage } from "./projects/ManageProjectsPage";
+export { default as ProjectDetailPage } from "./projects/ProjectDetailPage";
+export { default as EditProjectPage } from "./projects/EditProjectPage";
+export { default as CreateProjectPage } from "./projects/CreateProjectPage";
+export { default as CreatePostPage } from "./posts/CreatePostPage";

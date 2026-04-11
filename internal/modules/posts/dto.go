@@ -2,10 +2,11 @@ package posts
 
 type CreateRequest struct {
 	Content     string   `json:"content"`
+	Category    string   `json:"category"`
+	Quiz        *string  `json:"quiz"`
 	Image       *string  `json:"image"`
 	GitHubURL   *string  `json:"githubUrl"`
-	PRURL       *string  `json:"prUrl"`
-	IssueURL    *string  `json:"issueUrl"`
+	RefURLs     []string `json:"refUrls"`
 	WakatimeIDs []string `json:"wakatimeIds"`
 	ProjectID   string   `json:"projectId"`
 	Tags        []string `json:"tags"`
@@ -13,10 +14,11 @@ type CreateRequest struct {
 
 type UpdateRequest struct {
 	Content     *string  `json:"content"`
+	Category    *string  `json:"category"`
+	Quiz        *string  `json:"quiz"`
 	Image       *string  `json:"image"`
 	GitHubURL   *string  `json:"githubUrl"`
-	PRURL       *string  `json:"prUrl"`
-	IssueURL    *string  `json:"issueUrl"`
+	RefURLs     []string `json:"refUrls"`
 	WakatimeIDs []string `json:"wakatimeIds"`
 	ProjectID   *string  `json:"projectId"`
 }

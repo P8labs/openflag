@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from "react";
 
 function getInitialTheme() {
   if (typeof window === "undefined") {
-    return "light" as const;
+    return "dark" as const;
   }
 
   const saved = window.localStorage.getItem("openflag-theme");

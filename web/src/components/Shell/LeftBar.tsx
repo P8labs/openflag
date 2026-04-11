@@ -23,24 +23,25 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
+import { usePostComposer } from "../posts/PostComposerProvider";
 
 const navItems = [
   { label: "Home", to: "/app", icon: Home },
   { label: "Explore", to: "/app/explore", icon: Compass },
   { label: "Galaxy", to: "/app/galaxy", icon: Sparkles },
   { label: "Projects", to: "/app/projects", icon: FolderKanban },
-  { label: "Create Post", to: "/app/create", icon: SquarePen },
 ] as const;
 
 export default function LeftBar() {
   const location = useLocation();
+  const { openComposer } = usePostComposer();
   const isSettingsActive = location.pathname.startsWith("/app/settings");
 
   return (
-    <nav className="w-20 lg:w-48 border rounded-l-md border-secondary bg-secondary/20 p-5 fixed md:sticky top-0 h-[calc(100vh-1rem)] overflow-hidden">
+    <nav className="lg:min-w-50 border rounded-l-md border-secondary bg-secondary/20 p-2 fixed md:sticky top-0 h-[calc(100vh-1rem)] overflow-hidden">
       <TooltipProvider>
         <div className="flex h-full min-h-0 flex-col justify-between">
-          <div className="space-y-4 min-h-0 overflow-y-auto pr-1">
+          <div className="space-y-4 h-full overflow-y-auto pr-1">
             <div className="flex justify-center">
               <BrandLogo size="md" />
             </div>
@@ -54,6 +55,12 @@ export default function LeftBar() {
                   icon={item.icon}
                 />
               ))}
+
+              <ActionNavItem
+                label="Create Post"
+                icon={SquarePen}
+                onClick={() => openComposer()}
+              />
             </div>
           </div>
 
@@ -106,6 +113,43 @@ function IconNavItem({
             <Icon className="size-5 shrink-0" />
             <span className="hidden lg:block text-sm font-medium">{label}</span>
           </NavLink>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="lg:hidden">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function ActionNavItem({
+  label,
+  icon: Icon,
+  onClick,
+}: {
+  label: string;
+  icon: LucideIcon;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          asChild
+          type="button"
+          variant="ghost"
+          onClick={onClick}
+          className="rounded-full lg:rounded-md border border-transparent w-full"
+        >
+          <div
+            className={cn(
+              "flex size-11 h-10 justify-start gap-3 rounded-lg border transition-colors",
+              "text-foreground border-border hover:bg-accent hover:text-accent-foreground",
+            )}
+          >
+            <Icon className="size-5 shrink-0" />
+            <span className="hidden lg:block text-sm font-medium">{label}</span>
+          </div>
         </Button>
       </TooltipTrigger>
       <TooltipContent side="right" className="lg:hidden">

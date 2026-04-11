@@ -12,22 +12,32 @@ import (
 )
 
 var (
-	ErrPostNotFound  = errors.New("post not found")
-	ErrPostForbidden = errors.New("forbidden")
+	ErrPostNotFound        = errors.New("post not found")
+	ErrPostForbidden       = errors.New("forbidden")
+	ErrPostInvalidCategory = errors.New("invalid post category")
+)
+
+const (
+	PostCategoryDevlog  = "devlog"
+	PostCategoryThought = "thought"
+	PostCategoryShow    = "show"
+	PostCategoryEvent   = "event"
+	PostCategoryAsk     = "ask"
 )
 
 type Service struct {
-	repo        *Repository
-	projectRepo projectLookup
-	db          *gorm.DB
+	repo          *Repository
+	projectAccess projectLookup
+	db            *gorm.DB
 }
 
 type projectLookup interface {
-	FindByID(context.Context, string) (*models.Project, error)
+	Get(context.Context, string) (*models.Project, error)
+	TrackedMinutes(context.Context, string, string) (int, error)
 }
 
-func NewService(repo *Repository, projectRepo projectLookup, db *gorm.DB) *Service {
-	return &Service{repo: repo, projectRepo: projectRepo, db: db}
+func NewService(repo *Repository, projectAccess projectLookup, db *gorm.DB) *Service {
+	return &Service{repo: repo, projectAccess: projectAccess, db: db}
 }
 
 func (s *Service) List(ctx context.Context) ([]models.Post, error) {
@@ -52,9 +62,15 @@ func (s *Service) Create(ctx context.Context, authorID string, input CreateReque
 		return nil, errors.New("content is too long")
 	}
 
+	category, err := normalizePostCategory(input.Category)
+	if err != nil {
+		return nil, err
+	}
+
 	projectID := strings.TrimSpace(input.ProjectID)
+	devlogMinutes := (*int)(nil)
 	if projectID != "" {
-		project, err := s.projectRepo.FindByID(ctx, projectID)
+		project, err := s.projectAccess.Get(ctx, projectID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil, projectsmodule.ErrProjectNotFound
@@ -64,17 +80,37 @@ func (s *Service) Create(ctx context.Context, authorID string, input CreateReque
 		if project.OwnerID != authorID {
 			return nil, ErrPostForbidden
 		}
+
+		if category == PostCategoryDevlog {
+			totalTrackedMinutes, err := s.projectAccess.TrackedMinutes(ctx, projectID, authorID)
+			if err != nil {
+				return nil, err
+			}
+
+			alreadyLoggedMinutes, err := s.repo.SumLoggedDevlogMinutesByProject(ctx, projectID)
+			if err != nil {
+				return nil, err
+			}
+
+			remainingMinutes := totalTrackedMinutes - alreadyLoggedMinutes
+			if remainingMinutes < 0 {
+				remainingMinutes = 0
+			}
+			devlogMinutes = &remainingMinutes
+		}
 	}
 
 	post := &models.Post{
-		AuthorID:    authorID,
-		Content:     content,
-		Image:       input.Image,
-		GitHubURL:   input.GitHubURL,
-		PRURL:       input.PRURL,
-		IssueURL:    input.IssueURL,
-		WakatimeIDs: input.WakatimeIDs,
-		ProjectID:   nil,
+		AuthorID:      authorID,
+		Content:       content,
+		Category:      category,
+		DevlogMinutes: devlogMinutes,
+		Quiz:          normalizedOptionalStringPtr(input.Quiz),
+		Image:         input.Image,
+		GitHubURL:     input.GitHubURL,
+		RefURLs:       normalizeRefURLs(input.RefURLs),
+		WakatimeIDs:   input.WakatimeIDs,
+		ProjectID:     nil,
 	}
 	if projectID != "" {
 		post.ProjectID = &projectID
@@ -103,17 +139,24 @@ func (s *Service) Update(ctx context.Context, id string, authorID string, input 
 			updates["content"] = content
 		}
 	}
+	if input.Category != nil {
+		category, err := normalizePostCategory(*input.Category)
+		if err != nil {
+			return nil, err
+		}
+		updates["category"] = category
+	}
+	if input.Quiz != nil {
+		updates["quiz"] = normalizedOptionalStringPtr(input.Quiz)
+	}
 	if input.Image != nil {
 		updates["image"] = strings.TrimSpace(*input.Image)
 	}
 	if input.GitHubURL != nil {
 		updates["github_url"] = strings.TrimSpace(*input.GitHubURL)
 	}
-	if input.PRURL != nil {
-		updates["pr_url"] = strings.TrimSpace(*input.PRURL)
-	}
-	if input.IssueURL != nil {
-		updates["issue_url"] = strings.TrimSpace(*input.IssueURL)
+	if input.RefURLs != nil {
+		updates["ref_urls"] = normalizeRefURLs(input.RefURLs)
 	}
 	if input.WakatimeIDs != nil {
 		updates["wakatime_ids"] = input.WakatimeIDs
@@ -122,8 +165,9 @@ func (s *Service) Update(ctx context.Context, id string, authorID string, input 
 		projectID := strings.TrimSpace(*input.ProjectID)
 		if projectID == "" {
 			updates["project_id"] = nil
+			updates["devlog_minutes"] = nil
 		} else {
-			linked, err := s.projectRepo.FindByID(ctx, projectID)
+			linked, err := s.projectAccess.Get(ctx, projectID)
 			if err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return nil, projectsmodule.ErrProjectNotFound
@@ -167,4 +211,66 @@ func mapPostErr(err error) error {
 	}
 
 	return err
+}
+
+func normalizePostCategory(value string) (string, error) {
+	category := strings.ToLower(strings.TrimSpace(value))
+	if category == "" {
+		return PostCategoryDevlog, nil
+	}
+
+	switch category {
+	case PostCategoryDevlog, PostCategoryThought, PostCategoryShow, PostCategoryEvent, PostCategoryAsk:
+		return category, nil
+	default:
+		return "", ErrPostInvalidCategory
+	}
+}
+
+func normalizedOptionalStringPtr(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+
+	return &trimmed
+}
+
+func normalizeRefURLs(input []string) []string {
+	if len(input) == 0 {
+		return []string{}
+	}
+
+	normalized := make([]string, 0, len(input))
+	seen := map[string]struct{}{}
+	for _, raw := range input {
+		item := strings.TrimSpace(raw)
+		if item == "" {
+			continue
+		}
+
+		parts := strings.SplitN(item, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		refType := strings.ToLower(strings.TrimSpace(parts[0]))
+		refURL := strings.TrimSpace(parts[1])
+		if refType == "" || refURL == "" {
+			continue
+		}
+
+		composed := refType + ":" + refURL
+		if _, exists := seen[composed]; exists {
+			continue
+		}
+		seen[composed] = struct{}{}
+		normalized = append(normalized, composed)
+	}
+
+	return normalized
 }

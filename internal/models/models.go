@@ -73,7 +73,7 @@ type OAuthAccount struct {
 	CreatedAt         time.Time  `json:"createdAt"`
 	UpdatedAt         time.Time  `json:"updatedAt"`
 
-	User User `gorm:"constraint:OnDelete:CASCADE;" json:"user,omitempty"`
+	User User `gorm:"constraint:OnDelete:CASCADE;" json:"user"`
 }
 
 func (a *OAuthAccount) BeforeCreate(_ *gorm.DB) error {
@@ -88,6 +88,8 @@ type Project struct {
 	ID          string         `gorm:"primaryKey;size:36" json:"id"`
 	OwnerID     string         `gorm:"index;not null" json:"ownerId"`
 	Title       string         `gorm:"not null" json:"title"`
+	Status      string         `gorm:"type:text;not null;default:'dev'" json:"status"`
+	Summary     string         `gorm:"type:text;not null" json:"summary"`
 	Description string         `gorm:"type:text;not null" json:"description"`
 	Url         *string        `json:"url,omitempty"`
 	Image       *string        `json:"image,omitempty"`
@@ -113,17 +115,19 @@ func (p *Project) BeforeCreate(_ *gorm.DB) error {
 }
 
 type Post struct {
-	ID          string         `gorm:"primaryKey;size:36" json:"id"`
-	AuthorID    string         `gorm:"index;not null" json:"authorId"`
-	Content     string         `gorm:"type:text" json:"content"`
-	Image       *string        `json:"image,omitempty"`
-	GitHubURL   *string        `json:"githubUrl"`
-	PRURL       *string        `json:"prUrl"`
-	IssueURL    *string        `json:"issueUrl"`
-	WakatimeIDs pq.StringArray `gorm:"type:text[];default:'{}'" json:"wakatimeIds"`
-	ProjectID   *string        `gorm:"index" json:"projectId,omitempty"`
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
+	ID            string         `gorm:"primaryKey;size:36" json:"id"`
+	AuthorID      string         `gorm:"index;not null" json:"authorId"`
+	Content       string         `gorm:"type:text" json:"content"`
+	Category      string         `gorm:"type:text;not null;default:'devlog'" json:"category"`
+	DevlogMinutes *int           `json:"devlogMinutes,omitempty"`
+	Quiz          *string        `gorm:"type:text" json:"quiz,omitempty"`
+	Image         *string        `json:"image,omitempty"`
+	GitHubURL     *string        `json:"githubUrl"`
+	RefURLs       pq.StringArray `gorm:"type:text[];default:'{}'" json:"refUrls"`
+	WakatimeIDs   pq.StringArray `gorm:"type:text[];default:'{}'" json:"wakatimeIds"`
+	ProjectID     *string        `gorm:"index" json:"projectId,omitempty"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
 
 	Likes []User `gorm:"many2many:post_likes;constraint:OnDelete:CASCADE;" json:"likes,omitempty"`
 

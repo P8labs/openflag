@@ -103,6 +103,17 @@ func (r *Repository) UpsertProviderConnection(ctx context.Context, account *mode
 		Error
 }
 
+func (r *Repository) FindOAuthAccountByUserAndProvider(ctx context.Context, userID, provider string) (*models.OAuthAccount, error) {
+	var account models.OAuthAccount
+	if err := r.db.WithContext(ctx).
+		First(&account, "user_id = ? AND provider = ?", userID, provider).
+		Error; err != nil {
+		return nil, err
+	}
+
+	return &account, nil
+}
+
 func (r *Repository) CreateSession(ctx context.Context, session *models.Session) error {
 	return r.db.WithContext(ctx).Create(session).Error
 }

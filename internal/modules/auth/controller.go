@@ -94,6 +94,22 @@ func (ctl *Controller) CompleteOnboardingStep(c *gin.Context) {
 	response.Success(c, http.StatusOK, result)
 }
 
+func (ctl *Controller) WakaTimeProjects(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	projects, err := ctl.service.WakaTimeProjects(c.Request.Context(), userID.(string))
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, gin.H{"projects": projects})
+}
+
 func (ctl *Controller) Logout(c *gin.Context) {
 	token := ""
 	if cookie, err := c.Cookie("openflag_token"); err == nil {

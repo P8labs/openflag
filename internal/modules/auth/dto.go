@@ -51,3 +51,8 @@ type CompleteOnboardingStepRequest struct {
 	LookingFor     *string  `json:"lookingFor"`
 	WakatimeAPIKey *string  `json:"wakatimeApiKey"`
 }
+
+type WakaTimeProject struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}

@@ -45,7 +45,7 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 	projectController := projects.NewController(projectService)
 
 	postRepo := posts.NewRepository(db)
-	postService := posts.NewService(postRepo, projectRepo, db)
+	postService := posts.NewService(postRepo, projectService, db)
 	postController := posts.NewController(postService)
 
 	commentRepo := comments.NewRepository(db)
@@ -65,10 +65,13 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 		protected.Use(middleware.RequireAuth(authRepo))
 		{
 			protected.GET("/me", authController.Me)
+			protected.GET("/me/wakatime/projects", authController.WakaTimeProjects)
 			protected.POST("/me/onboarding/step", authController.CompleteOnboardingStep)
 			protected.GET("/projects", projectController.List)
 			protected.POST("/projects", projectController.Create)
 			protected.GET("/projects/:id", projectController.Get)
+			protected.GET("/projects/:id/tracked-time", projectController.TrackedTime)
+			protected.GET("/projects/github/references", projectController.GitHubReferences)
 			protected.PATCH("/projects/:id", projectController.Update)
 			protected.DELETE("/projects/:id", projectController.Delete)
 

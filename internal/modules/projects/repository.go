@@ -32,7 +32,9 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*models.Project, 
 	var project models.Project
 	if err := r.db.WithContext(ctx).
 		Preload("Owner").
+		Preload("Collaborators").
 		Preload("Posts").
+		Preload("Posts.Author").
 		First(&project, "id = ?", id).Error; err != nil {
 		return nil, err
 	}

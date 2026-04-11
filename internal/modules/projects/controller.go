@@ -95,3 +95,33 @@ func (ctl *Controller) Delete(c *gin.Context) {
 
 	response.Success(c, http.StatusOK, gin.H{"success": true})
 }
+
+func (ctl *Controller) TrackedTime(c *gin.Context) {
+	minutes, err := ctl.service.TrackedMinutes(c.Request.Context(), c.Param("id"), c.GetString("user_id"))
+	if err != nil {
+		status := http.StatusBadRequest
+		if err == ErrProjectNotFound {
+			status = http.StatusNotFound
+		}
+		response.Fail(c, status, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, gin.H{"minutes": minutes})
+}
+
+func (ctl *Controller) GitHubReferences(c *gin.Context) {
+	repoURL := c.Query("repoUrl")
+	if repoURL == "" {
+		response.Fail(c, http.StatusBadRequest, "repoUrl is required")
+		return
+	}
+
+	refs, err := ctl.service.GitHubReferences(c.Request.Context(), c.GetString("user_id"), repoURL)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, gin.H{"references": refs})
+}

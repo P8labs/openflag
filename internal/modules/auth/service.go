@@ -187,6 +187,23 @@ func (s *Service) Connections(ctx context.Context, userID string) (Connections, 
 	}, nil
 }
 
+func (s *Service) WakaTimeProjects(ctx context.Context, userID string) ([]WakaTimeProject, error) {
+	account, err := s.repo.FindOAuthAccountByUserAndProvider(ctx, userID, string(ProviderWakaTime))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("wakatime is not connected")
+		}
+		return nil, err
+	}
+
+	apiKey := strings.TrimSpace(account.AccessToken)
+	if apiKey == "" {
+		return nil, errors.New("wakatime api key is missing")
+	}
+
+	return s.fetchWakatimeProjects(ctx, apiKey)
+}
+
 func (s *Service) CompleteOnboardingStep(ctx context.Context, userID string, input CompleteOnboardingStepRequest) (*MeResponse, error) {
 	if input.Step < 1 || input.Step > 3 {
 		return nil, errors.New("step must be between 1 and 3")
@@ -447,6 +464,13 @@ type wakatimeCurrentUserResponse struct {
 	} `json:"data"`
 }
 
+type wakatimeProjectsResponse struct {
+	Data []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"data"`
+}
+
 func (s *Service) fetchWakatimeProfile(ctx context.Context, apiKey string) (*wakatimeCurrentUserResponse, error) {
 	endpoint := "https://wakatime.com/api/v1/users/current?api_key=" + url.QueryEscape(apiKey)
 	var payload wakatimeCurrentUserResponse
@@ -459,6 +483,34 @@ func (s *Service) fetchWakatimeProfile(ctx context.Context, apiKey string) (*wak
 	}
 
 	return &payload, nil
+}
+
+func (s *Service) fetchWakatimeProjects(ctx context.Context, apiKey string) ([]WakaTimeProject, error) {
+	endpoint := "https://wakatime.com/api/v1/users/current/projects?api_key=" + url.QueryEscape(apiKey)
+	var payload wakatimeProjectsResponse
+	if err := getJSON(ctx, s.httpClient, endpoint, &payload); err != nil {
+		return nil, errors.New("unable to fetch wakatime projects")
+	}
+
+	projects := make([]WakaTimeProject, 0, len(payload.Data))
+	for _, item := range payload.Data {
+		name := strings.TrimSpace(item.Name)
+		if name == "" {
+			continue
+		}
+
+		id := strings.TrimSpace(item.ID)
+		if id == "" {
+			id = name
+		}
+
+		projects = append(projects, WakaTimeProject{
+			ID:   id,
+			Name: name,
+		})
+	}
+
+	return projects, nil
 }
 
 func nullableString(value string) any {

@@ -53,7 +53,7 @@ export default function ThemeToggle({ variant = "icon" }: ThemeToggleProps) {
               <div
                 className={cn(
                   "flex size-11 h-10 justify-start gap-3 rounded-lg border transition-colors",
-                  "bg-background text-foreground border-border hover:bg-accent hover:text-accent-foreground",
+                  "text-foreground border-border hover:bg-accent hover:text-accent-foreground",
                 )}
               >
                 {theme === "dark" ? (
