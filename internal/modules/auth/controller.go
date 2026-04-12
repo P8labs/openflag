@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"openflag/internal/response"
@@ -79,7 +80,7 @@ func (ctl *Controller) Activity(c *gin.Context) {
 		return
 	}
 
-	summary, err := ctl.service.ActivitySummary(c.Request.Context(), userID.(string), 84)
+	summary, err := ctl.service.ActivitySummary(c.Request.Context(), userID.(string), 0)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, err.Error())
 		return
@@ -96,6 +97,78 @@ func (ctl *Controller) PublicProfile(c *gin.Context) {
 	}
 
 	response.Success(c, http.StatusOK, profile)
+}
+
+func (ctl *Controller) UpdateProfile(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var input UpdateProfileRequest
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	result, err := ctl.service.UpdateProfile(c.Request.Context(), userID.(string), input)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, result)
+}
+
+func (ctl *Controller) Notifications(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	limit := parsePositiveInt(c.Query("limit"), 20, 100)
+	offset := parsePositiveInt(c.Query("offset"), 0, 0)
+
+	payload, err := ctl.service.Notifications(c.Request.Context(), userID.(string), limit, offset)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, payload)
+}
+
+func (ctl *Controller) UnreadNotificationCount(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	count, err := ctl.service.UnreadNotificationCount(c.Request.Context(), userID.(string))
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, gin.H{"unreadCount": count})
+}
+
+func (ctl *Controller) MarkAllNotificationsRead(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	if err := ctl.service.MarkAllNotificationsRead(c.Request.Context(), userID.(string)); err != nil {
+		response.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, gin.H{"success": true})
 }
 
 func (ctl *Controller) CompleteOnboardingStep(c *gin.Context) {
@@ -171,6 +244,23 @@ func bearerToken(c *gin.Context) string {
 	}
 
 	return parts[1]
+}
+
+func parsePositiveInt(raw string, fallback int, max int) int {
+	if raw == "" {
+		return fallback
+	}
+
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 {
+		return fallback
+	}
+
+	if max > 0 && value > max {
+		return max
+	}
+
+	return value
 }
 
 func (ctl *Controller) setAuthCookie(c *gin.Context, token string) {

@@ -46,7 +46,8 @@ func (s *Service) Create(ctx context.Context, postID, userID string, input Creat
 		return nil, errors.New("content is required")
 	}
 
-	if _, err := s.postRepo.FindByID(ctx, postID); err != nil {
+	post, err := s.postRepo.FindByID(ctx, postID)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrCommentNotFound
 		}
@@ -61,6 +62,17 @@ func (s *Service) Create(ctx context.Context, postID, userID string, input Creat
 
 	if err := s.repo.Create(ctx, comment); err != nil {
 		return nil, err
+	}
+
+	if post.AuthorID != userID {
+		_ = s.db.WithContext(ctx).Create(&models.Notification{
+			UserID:     post.AuthorID,
+			ActorID:    userID,
+			Type:       "post_commented",
+			Message:    "commented on your post",
+			EntityType: "post",
+			EntityID:   postID,
+		}).Error
 	}
 
 	return s.repo.FindByID(ctx, comment.ID)

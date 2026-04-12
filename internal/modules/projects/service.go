@@ -13,6 +13,7 @@ import (
 
 	"openflag/internal/models"
 
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -57,8 +58,51 @@ func NewService(repo *Repository, db *gorm.DB) *Service {
 	}
 }
 
-func (s *Service) List(ctx context.Context, limit int, offset int) ([]models.Project, bool, error) {
-	return s.repo.List(ctx, limit, offset)
+func (s *Service) List(ctx context.Context, userID string, limit int, offset int) ([]models.Project, bool, error) {
+	projects, hasMore, err := s.repo.List(ctx, limit, offset)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if userID == "" {
+		return projects, hasMore, nil
+	}
+
+	var account models.OAuthAccount
+	if err := s.db.WithContext(ctx).
+		First(&account, "user_id = ? AND provider = ?", userID, "github").
+		Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return projects, hasMore, nil
+		}
+		return nil, false, err
+	}
+
+	token := strings.TrimSpace(account.AccessToken)
+	if token == "" {
+		return projects, hasMore, nil
+	}
+
+	for index := range projects {
+		if projects[index].GitHubURL == nil || strings.TrimSpace(*projects[index].GitHubURL) == "" {
+			continue
+		}
+
+		owner, repo, parseErr := parseGitHubRepo(*projects[index].GitHubURL)
+		if parseErr != nil {
+			continue
+		}
+
+		endpoint := fmt.Sprintf("https://api.github.com/user/starred/%s/%s", url.PathEscape(owner), url.PathEscape(repo))
+		starred, starErr := getGitHubStarStatus(ctx, s.httpClient, endpoint, token)
+		if starErr != nil {
+			continue
+		}
+
+		projects[index].GitHubStarred = starred
+	}
+
+	return projects, hasMore, nil
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*models.Project, error) {
@@ -127,12 +171,12 @@ func (s *Service) Update(ctx context.Context, id string, ownerID string, input U
 	setNullableTrimmed(updates, "url", input.ProjectURL)
 	setNullableTrimmed(updates, "image", firstProvided(input.ImageURL, input.Image))
 	setNullableTrimmed(updates, "video", firstProvided(input.VideoURL, input.Video))
-	setNullableTrimmed(updates, "githubUrl", input.GitHubURL)
+	setNullableTrimmed(updates, "github_url", input.GitHubURL)
 	if input.WakatimeIDs != nil {
 		updates["wakatime_ids"] = input.WakatimeIDs
 	}
 	if input.Tags != nil {
-		updates["tags"] = normalizeTags(*input.Tags)
+		updates["tags"] = pq.Array(normalizeTags(*input.Tags))
 	}
 
 	if len(updates) == 0 {
@@ -160,14 +204,25 @@ func (s *Service) Delete(ctx context.Context, id string, ownerID string) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *Service) TrackedMinutes(ctx context.Context, id string, userID string) (int, error) {
+func (s *Service) TrackedMinutes(ctx context.Context, id string, userID string) (*TrackedTimeResponse, error) {
 	project, err := s.repo.FindByID(ctx, id)
 	if err != nil {
-		return 0, mapProjectErr(err)
+		return nil, mapProjectErr(err)
+	}
+
+	loggedMinutes := 0
+	for _, post := range project.Posts {
+		if post.DevlogMinutes != nil {
+			loggedMinutes += *post.DevlogMinutes
+		}
 	}
 
 	if len(project.WakatimeIDs) == 0 {
-		return 0, nil
+		return &TrackedTimeResponse{
+			TotalMinutes:     0,
+			LoggedMinutes:    loggedMinutes,
+			NotLoggedMinutes: 0,
+		}, nil
 	}
 
 	var account models.OAuthAccount
@@ -175,22 +230,28 @@ func (s *Service) TrackedMinutes(ctx context.Context, id string, userID string) 
 		First(&account, "user_id = ? AND provider = ?", userID, "wakatime").
 		Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, errors.New("wakatime is not connected")
+			return nil, errors.New("wakatime is not connected")
 		}
-		return 0, err
+		return nil, err
 	}
 
 	apiKey := strings.TrimSpace(account.AccessToken)
 	if apiKey == "" {
-		return 0, errors.New("wakatime api key is missing")
+		return nil, errors.New("wakatime api key is missing")
 	}
 
-	minutes, err := s.fetchWakaTimeTrackedMinutes(ctx, apiKey, project.WakatimeIDs)
+	totalMinutes, err := s.fetchWakaTimeTrackedMinutes(ctx, apiKey, project.WakatimeIDs)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return minutes, nil
+	notLogged := max(totalMinutes-loggedMinutes, 0)
+
+	return &TrackedTimeResponse{
+		TotalMinutes:     totalMinutes,
+		LoggedMinutes:    loggedMinutes,
+		NotLoggedMinutes: notLogged,
+	}, nil
 }
 
 func (s *Service) GitHubReferences(ctx context.Context, userID string, repoURL string) (*GitHubReferencesResponse, error) {
@@ -295,6 +356,17 @@ func (s *Service) StarGitHubProject(ctx context.Context, userID string, projectI
 	endpoint := fmt.Sprintf("https://api.github.com/user/starred/%s/%s", url.PathEscape(owner), url.PathEscape(repo))
 	if err := putGitHubNoContent(ctx, s.httpClient, endpoint, token); err != nil {
 		return err
+	}
+
+	if project.OwnerID != userID {
+		_ = s.db.WithContext(ctx).Create(&models.Notification{
+			UserID:     project.OwnerID,
+			ActorID:    userID,
+			Type:       "project_starred",
+			Message:    "starred your project",
+			EntityType: "project",
+			EntityID:   project.ID,
+		}).Error
 	}
 
 	return nil
@@ -555,6 +627,35 @@ func putGitHubNoContent(ctx context.Context, client *http.Client, requestURL str
 	}
 
 	return nil
+}
+
+func getGitHubStarStatus(ctx context.Context, client *http.Client, requestURL string, accessToken string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNoContent {
+		return true, nil
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return false, nil
+	}
+	if resp.StatusCode >= http.StatusBadRequest {
+		body, _ := io.ReadAll(resp.Body)
+		return false, fmt.Errorf("github api error: %s", strings.TrimSpace(string(body)))
+	}
+
+	return false, nil
 }
 
 func parseGitHubRepo(repoURL string) (string, string, error) {

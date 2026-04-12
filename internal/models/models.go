@@ -9,19 +9,20 @@ import (
 )
 
 type User struct {
-	ID           string         `gorm:"primaryKey;size:36" json:"id"`
-	Name         string         `gorm:"not null" json:"name"`
-	Username     string         `gorm:"uniqueIndex;not null" json:"username" default:""`
-	Email        string         `gorm:"uniqueIndex;not null" json:"email"`
-	Image        *string        `json:"image,omitempty"`
-	Bio          *string        `gorm:"type:text" json:"bio,omitempty"`
-	OnboardState int            `gorm:"default:0" json:"onboardState"`
-	Skills       pq.StringArray `gorm:"type:text[];default:'{}'" json:"skills"`
-	Interests    pq.StringArray `gorm:"type:text[];default:'{}'" json:"interests"`
-	Availability *string        `json:"availability,omitempty"`
-	LookingFor   *string        `json:"lookingFor,omitempty"`
-	CreatedAt    time.Time      `json:"createdAt"`
-	UpdatedAt    time.Time      `json:"updatedAt"`
+	ID                string         `gorm:"primaryKey;size:36" json:"id"`
+	Name              string         `gorm:"not null" json:"name"`
+	Username          string         `gorm:"uniqueIndex;not null" json:"username" default:""`
+	UsernameChangedAt *time.Time     `gorm:"index" json:"usernameChangedAt,omitempty"`
+	Email             string         `gorm:"uniqueIndex;not null" json:"email"`
+	Image             *string        `json:"image,omitempty"`
+	Bio               *string        `gorm:"type:text" json:"bio,omitempty"`
+	OnboardState      int            `gorm:"default:0" json:"onboardState"`
+	Skills            pq.StringArray `gorm:"type:text[];default:'{}'" json:"skills"`
+	Interests         pq.StringArray `gorm:"type:text[];default:'{}'" json:"interests"`
+	Availability      *string        `json:"availability,omitempty"`
+	LookingFor        *string        `json:"lookingFor,omitempty"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
 
 	Accounts []OAuthAccount `gorm:"foreignKey:UserID;references:ID" json:"accounts,omitempty"`
 	Sessions []Session      `gorm:"foreignKey:UserID;references:ID" json:"sessions,omitempty"`
@@ -32,7 +33,8 @@ type User struct {
 
 	LikedPosts []Post `gorm:"many2many:post_likes;constraint:OnDelete:CASCADE;" json:"likedPosts,omitempty"`
 
-	ContributedProjects []Project `gorm:"many2many:project_collaborators;constraint:OnDelete:CASCADE;" json:"contributedProjects,omitempty"`
+	ContributedProjects []Project      `gorm:"many2many:project_collaborators;constraint:OnDelete:CASCADE;" json:"contributedProjects,omitempty"`
+	Notifications       []Notification `gorm:"foreignKey:UserID;references:ID" json:"notifications,omitempty"`
 }
 
 func (u *User) BeforeCreate(_ *gorm.DB) error {
@@ -86,21 +88,22 @@ func (a *OAuthAccount) BeforeCreate(_ *gorm.DB) error {
 }
 
 type Project struct {
-	ID          string         `gorm:"primaryKey;size:36" json:"id"`
-	OwnerID     string         `gorm:"index;not null" json:"ownerId"`
-	Title       string         `gorm:"not null" json:"title"`
-	Status      string         `gorm:"type:text;not null;default:'dev'" json:"status"`
-	Summary     string         `gorm:"type:text;not null" json:"summary"`
-	Description string         `gorm:"type:text;not null" json:"description"`
-	LogoURL     *string        `json:"logoUrl"`
-	Url         *string        `json:"url,omitempty"`
-	Image       *string        `json:"image,omitempty"`
-	Video       *string        `json:"video,omitempty"`
-	GitHubURL   *string        `json:"githubUrl"`
-	WakatimeIDs pq.StringArray `gorm:"type:text[];default:'{}'" json:"wakatimeIds"`
-	Tags        pq.StringArray `gorm:"type:text[];default:'{}'" json:"tags"`
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
+	ID            string         `gorm:"primaryKey;size:36" json:"id"`
+	OwnerID       string         `gorm:"index;not null" json:"ownerId"`
+	Title         string         `gorm:"not null" json:"title"`
+	Status        string         `gorm:"type:text;not null;default:'dev'" json:"status"`
+	Summary       string         `gorm:"type:text;not null" json:"summary"`
+	Description   string         `gorm:"type:text;not null" json:"description"`
+	LogoURL       *string        `json:"logoUrl"`
+	Url           *string        `json:"url,omitempty"`
+	Image         *string        `json:"image,omitempty"`
+	Video         *string        `json:"video,omitempty"`
+	GitHubURL     *string        `gorm:"column:github_url" json:"githubUrl"`
+	WakatimeIDs   pq.StringArray `gorm:"type:text[];default:'{}'" json:"wakatimeIds"`
+	Tags          pq.StringArray `gorm:"type:text[];default:'{}'" json:"tags"`
+	GitHubStarred bool           `gorm:"-" json:"githubStarred,omitempty"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
 
 	Collaborators []User `gorm:"many2many:project_collaborators;constraint:OnDelete:CASCADE;" json:"collaborators,omitempty"`
 
@@ -202,6 +205,30 @@ type UserActivity struct {
 func (a *UserActivity) BeforeCreate(_ *gorm.DB) error {
 	if a.ID == "" {
 		a.ID = uuid.NewString()
+	}
+
+	return nil
+}
+
+type Notification struct {
+	ID         string     `gorm:"primaryKey;size:36" json:"id"`
+	UserID     string     `gorm:"index;not null" json:"userId"`
+	ActorID    string     `gorm:"index;not null" json:"actorId"`
+	Type       string     `gorm:"type:text;not null" json:"type"`
+	Message    string     `gorm:"type:text;not null" json:"message"`
+	EntityType string     `gorm:"type:text;not null" json:"entityType"`
+	EntityID   string     `gorm:"index;not null" json:"entityId"`
+	ReadAt     *time.Time `gorm:"index" json:"readAt,omitempty"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
+
+	User  User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE;" json:"user,omitempty"`
+	Actor User `gorm:"foreignKey:ActorID;references:ID;constraint:OnDelete:CASCADE;" json:"actor,omitempty"`
+}
+
+func (n *Notification) BeforeCreate(_ *gorm.DB) error {
+	if n.ID == "" {
+		n.ID = uuid.NewString()
 	}
 
 	return nil

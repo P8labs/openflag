@@ -10,6 +10,7 @@ import {
   ManageProjectsPage,
   ManifestoPage,
   NotFoundPage,
+  NotificationsPage,
   OnboardPage,
   ProjectDetailPage,
   UserProfilePage,
@@ -52,6 +53,7 @@ export default function App() {
               <Route path="posts/compose" element={<CreatePostPage />} />
               <Route path="explore" element={<ExplorePage />} />
               <Route path="galaxy" element={<GalaxyPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
             </Route>
             <Route path=":username" element={<AppShell />}>
               <Route index element={<UserProfilePage />} />

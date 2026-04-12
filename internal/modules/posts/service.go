@@ -35,7 +35,7 @@ type Service struct {
 
 type projectLookup interface {
 	Get(context.Context, string) (*models.Project, error)
-	TrackedMinutes(context.Context, string, string) (int, error)
+	TrackedMinutes(context.Context, string, string) (*projectsmodule.TrackedTimeResponse, error)
 }
 
 func NewService(repo *Repository, projectAccess projectLookup, db *gorm.DB) *Service {
@@ -100,7 +100,7 @@ func (s *Service) Create(ctx context.Context, authorID string, input CreateReque
 		}
 
 		if category == PostCategoryDevlog {
-			totalTrackedMinutes, err := s.projectAccess.TrackedMinutes(ctx, projectID, authorID)
+			trackedTime, err := s.projectAccess.TrackedMinutes(ctx, projectID, authorID)
 			if err != nil {
 				return nil, err
 			}
@@ -110,7 +110,7 @@ func (s *Service) Create(ctx context.Context, authorID string, input CreateReque
 				return nil, err
 			}
 
-			remainingMinutes := totalTrackedMinutes - alreadyLoggedMinutes
+			remainingMinutes := trackedTime.TotalMinutes - alreadyLoggedMinutes
 			if remainingMinutes < 0 {
 				remainingMinutes = 0
 			}
@@ -247,6 +247,18 @@ func (s *Service) ToggleLike(ctx context.Context, id string, userID string) (*mo
 			return nil, false, err
 		}
 		liked = true
+		if postOwner, findErr := s.repo.FindByID(ctx, id); findErr == nil {
+			if postOwner.AuthorID != userID {
+				_ = s.db.WithContext(ctx).Create(&models.Notification{
+					UserID:     postOwner.AuthorID,
+					ActorID:    userID,
+					Type:       "post_liked",
+					Message:    "liked your post",
+					EntityType: "post",
+					EntityID:   id,
+				}).Error
+			}
+		}
 	}
 
 	post, err := s.repo.FindByID(ctx, id)

@@ -30,6 +30,7 @@ var ErrInvalidProvider = errors.New("invalid oauth provider")
 var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_\.]{3,30}$`)
 
 const sessionDuration = 24 * time.Hour
+const usernameChangeCooldown = 7 * 24 * time.Hour
 
 type Service struct {
 	repo       *Repository
@@ -173,7 +174,12 @@ func (s *Service) Me(ctx context.Context, userID string) (*models.User, error) {
 
 func (s *Service) ActivitySummary(ctx context.Context, userID string, days int) (*ActivitySummaryResponse, error) {
 	if days <= 0 {
-		days = 84
+		today := time.Now().UTC().Truncate(24 * time.Hour)
+		if today.Year()%4 == 0 && (today.Year()%100 != 0 || today.Year()%400 == 0) {
+			days = 366
+		} else {
+			days = 365
+		}
 	}
 
 	today := time.Now().UTC().Truncate(24 * time.Hour)
@@ -288,6 +294,141 @@ func (s *Service) PublicProfile(ctx context.Context, username string) (*PublicUs
 	return profile, nil
 }
 
+func (s *Service) UpdateProfile(ctx context.Context, userID string, input UpdateProfileRequest) (*MeResponse, error) {
+	user, err := s.repo.FindUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	updates := map[string]any{}
+
+	if input.Username != nil {
+		nextUsername := strings.TrimSpace(*input.Username)
+		if nextUsername == "" {
+			return nil, errors.New("username is required")
+		}
+		if !usernamePattern.MatchString(nextUsername) {
+			return nil, errors.New("username must be 3-30 chars and only letters, numbers, _ or .")
+		}
+
+		if !strings.EqualFold(nextUsername, user.Username) {
+			if user.UsernameChangedAt != nil {
+				nextAllowed := user.UsernameChangedAt.Add(usernameChangeCooldown)
+				if time.Now().UTC().Before(nextAllowed) {
+					return nil, fmt.Errorf("username can be changed again after %s", nextAllowed.Format("2006-01-02"))
+				}
+			}
+
+			existing, findErr := s.repo.FindUserByUsername(ctx, nextUsername)
+			if findErr == nil && existing.ID != userID {
+				return nil, errors.New("username is already taken")
+			}
+			if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
+				return nil, findErr
+			}
+
+			now := time.Now().UTC()
+			updates["username"] = nextUsername
+			updates["username_changed_at"] = now
+		}
+	}
+
+	if input.Bio != nil {
+		value := strings.TrimSpace(*input.Bio)
+		updates["bio"] = nullableString(value)
+	}
+
+	if input.Availability != nil {
+		value := strings.TrimSpace(*input.Availability)
+		updates["availability"] = nullableString(value)
+	}
+
+	if input.LookingFor != nil {
+		value := strings.TrimSpace(*input.LookingFor)
+		updates["looking_for"] = nullableString(value)
+	}
+
+	if input.Skills != nil {
+		updates["skills"] = pq.StringArray(normalizeStringList(input.Skills))
+	}
+
+	if input.Interests != nil {
+		updates["interests"] = pq.StringArray(normalizeStringList(input.Interests))
+	}
+
+	if len(updates) > 0 {
+		if err := s.repo.db.WithContext(ctx).Model(user).Updates(updates).Error; err != nil {
+			return nil, err
+		}
+	}
+
+	updatedUser, err := s.repo.FindUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	connections, err := s.Connections(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MeResponse{User: updatedUser, Connections: connections}, nil
+}
+
+func (s *Service) Notifications(ctx context.Context, userID string, limit int, offset int) (*NotificationsResponse, error) {
+	notifications, err := s.repo.ListNotifications(ctx, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	unreadCount, err := s.repo.CountUnreadNotifications(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &NotificationsResponse{
+		Notifications: make([]NotificationItem, 0, len(notifications)),
+		UnreadCount:   int(unreadCount),
+	}
+
+	for _, notification := range notifications {
+		item := NotificationItem{
+			ID:         notification.ID,
+			Type:       notification.Type,
+			Message:    notification.Message,
+			EntityType: notification.EntityType,
+			EntityID:   notification.EntityID,
+			CreatedAt:  notification.CreatedAt.UTC().Format(time.RFC3339),
+		}
+		if notification.ReadAt != nil {
+			value := notification.ReadAt.UTC().Format(time.RFC3339)
+			item.ReadAt = &value
+		}
+
+		item.Actor.ID = notification.Actor.ID
+		item.Actor.Name = notification.Actor.Name
+		item.Actor.Username = notification.Actor.Username
+		item.Actor.Image = notification.Actor.Image
+
+		response.Notifications = append(response.Notifications, item)
+	}
+
+	return response, nil
+}
+
+func (s *Service) UnreadNotificationCount(ctx context.Context, userID string) (int, error) {
+	unreadCount, err := s.repo.CountUnreadNotifications(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+
+	return int(unreadCount), nil
+}
+
+func (s *Service) MarkAllNotificationsRead(ctx context.Context, userID string) error {
+	return s.repo.MarkAllNotificationsRead(ctx, userID)
+}
+
 func computeStreaks(days []ActivityDay) (int, int) {
 	if len(days) == 0 {
 		return 0, 0
@@ -380,6 +521,10 @@ func (s *Service) CompleteOnboardingStep(ctx context.Context, userID string, inp
 		}
 
 		updates["username"] = username
+		if user.Username == "" || !strings.EqualFold(user.Username, username) {
+			now := time.Now().UTC()
+			updates["username_changed_at"] = now
+		}
 		updates["bio"] = bio
 		updates["skills"] = pq.StringArray(normalizeStringList(input.Skills))
 		updates["interests"] = pq.StringArray(normalizeStringList(input.Interests))

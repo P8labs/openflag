@@ -58,7 +58,9 @@ type ProjectDetail = {
 };
 
 type TrackedTimeResponse = {
-  minutes: number;
+  totalMinutes: number;
+  loggedMinutes: number;
+  notLoggedMinutes: number;
 };
 
 type MediaItem = {
@@ -172,7 +174,6 @@ export default function ProjectDetailPage() {
 
   const wakatimeIds = project?.wakatimeIds ?? [];
   const collaborators = project?.collaborators ?? [];
-  const linkedPosts = project?.posts ?? [];
   const tags = project?.tags ?? [];
 
   const trackedTimeQuery = useQuery({
@@ -258,15 +259,9 @@ export default function ProjectDetailPage() {
     );
   }
 
-  const totalTrackedMinutes = trackedTimeQuery.data?.minutes ?? 0;
-  const loggedDevlogMinutes = linkedPosts.reduce(
-    (sum, post) => sum + (post.devlogMinutes ?? 0),
-    0,
-  );
-  const notLoggedMinutes = Math.max(
-    totalTrackedMinutes - loggedDevlogMinutes,
-    0,
-  );
+  const totalTrackedMinutes = trackedTimeQuery.data?.totalMinutes ?? 0;
+  const loggedDevlogMinutes = trackedTimeQuery.data?.loggedMinutes ?? 0;
+  const notLoggedMinutes = trackedTimeQuery.data?.notLoggedMinutes ?? 0;
   const isOwner = user?.id === project.owner.id;
 
   return (
@@ -415,8 +410,8 @@ export default function ProjectDetailPage() {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                WakaTime is fetched first, then we compare tracked minutes with
-                logged devlog minutes from linked posts.
+                Time values are calculated on the backend from WakaTime totals
+                and linked devlog entries.
               </p>
 
               {trackedTimeQuery.isError ? (

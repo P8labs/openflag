@@ -1,18 +1,15 @@
+import { NavLink, type NavLinkRenderProps } from "react-router-dom";
 import {
-  NavLink,
-  useLocation,
-  type NavLinkRenderProps,
-} from "react-router-dom";
-import {
+  Bell,
   Compass,
   FolderKanban,
   Home,
   LogOutIcon,
-  Settings,
   Sparkles,
   SquarePen,
   type LucideIcon,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "../ui/button";
 import { BrandLogo } from "../ui/brand-logo";
@@ -26,6 +23,7 @@ import {
 } from "../ui/tooltip";
 import { usePostComposer } from "../posts/PostComposerProvider";
 import { useAuth } from "@/context/auth-context";
+import { apiFetch } from "@/lib/api";
 
 const navItems = [
   { label: "Home", to: "/app", icon: Home },
@@ -36,9 +34,16 @@ const navItems = [
 
 export default function LeftBar() {
   const { signOut } = useAuth();
-  // const location = useLocation();
   const { openComposer } = usePostComposer();
-  // const isSettingsActive = location.pathname.startsWith("/app/settings");
+  const unreadQuery = useQuery({
+    queryKey: ["notifications-unread-count"],
+    queryFn: () =>
+      apiFetch<{ unreadCount: number }>(
+        "/api/v1/me/notifications/unread-count",
+      ),
+    staleTime: 20_000,
+  });
+  const unread = unreadQuery.data?.unreadCount ?? 0;
 
   return (
     <nav className="lg:min-w-50 border rounded-l-md border-secondary bg-secondary/20 p-2 fixed md:sticky top-0 h-[calc(100vh-1rem)] overflow-hidden">
@@ -58,6 +63,13 @@ export default function LeftBar() {
                   icon={item.icon}
                 />
               ))}
+
+              <IconNavItem
+                to="/app/notifications"
+                label="Notifications"
+                icon={Bell}
+                badge={unread}
+              />
 
               <ActionNavItem
                 label="Create Post"
@@ -93,11 +105,13 @@ function IconNavItem({
   label,
   icon: Icon,
   forceActive,
+  badge,
 }: {
   to: string;
   label: string;
   icon: LucideIcon;
   forceActive?: boolean;
+  badge?: number;
 }) {
   return (
     <Tooltip>
@@ -119,7 +133,14 @@ function IconNavItem({
             }
             aria-label={label}
           >
-            <Icon className="size-5 shrink-0" />
+            <span className="relative inline-flex">
+              <Icon className="size-5 shrink-0" />
+              {badge && badge > 0 ? (
+                <span className="absolute -right-2 -top-2 inline-flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] text-destructive-foreground">
+                  {badge > 9 ? "9+" : badge}
+                </span>
+              ) : null}
+            </span>
             <span className="hidden lg:block text-sm font-medium">{label}</span>
           </NavLink>
         </Button>

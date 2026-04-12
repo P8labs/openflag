@@ -1,5 +1,6 @@
 import { Outlet } from "react-router-dom";
 import LeftBar from "./Shell/LeftBar";
+import MobileTopBar from "./Shell/MobileTopBar";
 import RightBar from "./Shell/RightBar";
 import MobileBar from "./Shell/Mobilebar";
 import { PostComposerProvider } from "./posts/PostComposerProvider";
@@ -15,6 +16,7 @@ export function AppShell() {
           </aside>
 
           <ScrollArea className="mb-16 md:mb-0 w-full min-w-0 max-w-3xl md:h-[calc(100vh-1rem)] h-[calc(100vh-5rem)] overflow-y-auto border border-secondary bg-secondary/20">
+            <MobileTopBar />
             <Outlet />
             <ScrollBar className="w-1" />
           </ScrollArea>

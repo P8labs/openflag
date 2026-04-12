@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import { loginWithProvider } from "@/context/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Link } from "react-router-dom";
+import { StreakHeatmap } from "./StreakHeatmap";
 
 type ActivityResponse = {
   currentStreak: number;
@@ -39,7 +40,7 @@ function ProfileCard() {
     .toUpperCase();
 
   return (
-    <section className="w-full  space-y-3">
+    <section className="w-full space-y-3">
       <header className="space-y-3">
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
           Profile
@@ -70,40 +71,13 @@ function ProfileCard() {
         </div>
       </header>
 
-      <div className="space-y-3 border-t border-border pt-4">
-        <div className="flex items-center justify-between">
-          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-            Streak
-          </p>
-          <span className="text-xs text-muted-foreground">
-            {activityQuery.data?.currentStreak ?? 0}d
-          </span>
-        </div>
-
-        <div className="grid grid-cols-12 gap-1">
-          {(activityQuery.data?.days ?? []).slice(-84).map((day) => (
-            <span
-              key={day.date}
-              title={`${day.date} • ${day.count} posts`}
-              className={
-                day.count >= 4
-                  ? "h-2.5 w-2.5 rounded-sm bg-primary"
-                  : day.count === 3
-                    ? "h-2.5 w-2.5 rounded-sm bg-primary/90"
-                    : day.count === 2
-                      ? "h-2.5 w-2.5 rounded-sm bg-primary/80"
-                      : day.count === 1
-                        ? "h-2.5 w-2.5 rounded-sm bg-primary/70"
-                        : "h-2.5 w-2.5 rounded-sm bg-muted"
-              }
-            />
-          ))}
-        </div>
-
-        <p className="text-xs text-muted-foreground">
-          Longest streak: {activityQuery.data?.longestStreak ?? 0}d
-        </p>
-      </div>
+      <StreakHeatmap
+        title="Streak"
+        currentStreak={activityQuery.data?.currentStreak ?? 0}
+        longestStreak={activityQuery.data?.longestStreak ?? 0}
+        days={activityQuery.data?.days ?? []}
+        className="border-t border-border pt-4"
+      />
 
       <div className="space-y-2 border-t border-border pt-4">
         <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">

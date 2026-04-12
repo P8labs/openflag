@@ -199,3 +199,42 @@ func (r *Repository) SumTrackedMinutesByUser(ctx context.Context, userID string)
 
 	return total, nil
 }
+
+func (r *Repository) ListNotifications(ctx context.Context, userID string, limit int, offset int) ([]models.Notification, error) {
+	var notifications []models.Notification
+	query := r.db.WithContext(ctx).
+		Preload("Actor").
+		Where("user_id = ?", userID).
+		Order("created_at desc")
+
+	if limit > 0 {
+		query = query.Offset(offset).Limit(limit)
+	}
+
+	if err := query.Find(&notifications).Error; err != nil {
+		return nil, err
+	}
+
+	return notifications, nil
+}
+
+func (r *Repository) CountUnreadNotifications(ctx context.Context, userID string) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&models.Notification{}).
+		Where("user_id = ? AND read_at IS NULL", userID).
+		Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (r *Repository) MarkAllNotificationsRead(ctx context.Context, userID string) error {
+	now := time.Now().UTC()
+	return r.db.WithContext(ctx).
+		Model(&models.Notification{}).
+		Where("user_id = ? AND read_at IS NULL", userID).
+		Update("read_at", now).Error
+}

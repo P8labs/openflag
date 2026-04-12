@@ -107,3 +107,33 @@ type PublicUserProfileResponse struct {
 	RecentPosts      []PublicPostSummary    `json:"recentPosts"`
 	ActivityDays     []ActivityDay          `json:"activityDays"`
 }
+
+type UpdateProfileRequest struct {
+	Username     *string  `json:"username"`
+	Bio          *string  `json:"bio"`
+	Skills       []string `json:"skills"`
+	Interests    []string `json:"interests"`
+	Availability *string  `json:"availability"`
+	LookingFor   *string  `json:"lookingFor"`
+}
+
+type NotificationItem struct {
+	ID         string  `json:"id"`
+	Type       string  `json:"type"`
+	Message    string  `json:"message"`
+	EntityType string  `json:"entityType"`
+	EntityID   string  `json:"entityId"`
+	CreatedAt  string  `json:"createdAt"`
+	ReadAt     *string `json:"readAt,omitempty"`
+	Actor      struct {
+		ID       string  `json:"id"`
+		Name     string  `json:"name"`
+		Username string  `json:"username"`
+		Image    *string `json:"image,omitempty"`
+	} `json:"actor"`
+}
+
+type NotificationsResponse struct {
+	Notifications []NotificationItem `json:"notifications"`
+	UnreadCount   int                `json:"unreadCount"`
+}

@@ -21,7 +21,7 @@ func (ctl *Controller) List(c *gin.Context) {
 	limit := parsePositiveInt(c.Query("limit"), 0, 100)
 	offset := parsePositiveInt(c.Query("offset"), 0, 0)
 
-	projects, hasMore, err := ctl.service.List(c.Request.Context(), limit, offset)
+	projects, hasMore, err := ctl.service.List(c.Request.Context(), c.GetString("user_id"), limit, offset)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, err.Error())
 		return
@@ -123,7 +123,7 @@ func (ctl *Controller) Delete(c *gin.Context) {
 }
 
 func (ctl *Controller) TrackedTime(c *gin.Context) {
-	minutes, err := ctl.service.TrackedMinutes(c.Request.Context(), c.Param("id"), c.GetString("user_id"))
+	tracked, err := ctl.service.TrackedMinutes(c.Request.Context(), c.Param("id"), c.GetString("user_id"))
 	if err != nil {
 		status := http.StatusBadRequest
 		if err == ErrProjectNotFound {
@@ -133,7 +133,7 @@ func (ctl *Controller) TrackedTime(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, http.StatusOK, gin.H{"minutes": minutes})
+	response.Success(c, http.StatusOK, tracked)
 }
 
 func (ctl *Controller) GitHubReferences(c *gin.Context) {

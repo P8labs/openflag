@@ -4,6 +4,7 @@ export type User = {
   email: string;
   image: string | null;
   username: string;
+  usernameChangedAt?: string | null;
   bio: string | null;
   onboardState: number;
   interests: string[];

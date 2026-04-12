@@ -41,3 +41,9 @@ type GitHubReferencesResponse struct {
 	PRs    []GitHubReference `json:"prs"`
 	Issues []GitHubReference `json:"issues"`
 }
+
+type TrackedTimeResponse struct {
+	TotalMinutes     int `json:"totalMinutes"`
+	LoggedMinutes    int `json:"loggedMinutes"`
+	NotLoggedMinutes int `json:"notLoggedMinutes"`
+}
