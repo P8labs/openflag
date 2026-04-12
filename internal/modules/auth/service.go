@@ -84,7 +84,7 @@ func (s *Service) LoginURL(provider string) (LoginResponse, error) {
 	return LoginResponse{AuthURL: cfg.AuthCodeURL(state, oauth2.AccessTypeOffline), State: state}, nil
 }
 
-func (s *Service) Callback(ctx context.Context, provider, code string) (*AuthResponse, error) {
+func (s *Service) Callback(ctx context.Context, provider, code string, currentUserID string) (*AuthResponse, error) {
 	cfg, ok := s.providers[provider]
 	if !ok {
 		return nil, ErrInvalidProvider
@@ -109,31 +109,47 @@ func (s *Service) Callback(ctx context.Context, provider, code string) (*AuthRes
 		name = strings.Split(profile.Email, "@")[0]
 	}
 
-	usernameFromEmail := strings.Split(profile.Email, "@")[0] + "_" + randomString(6)
-
-	user := &models.User{
-		Name:     name,
-		Email:    profile.Email,
-		Image:    &profile.Image,
-		Username: usernameFromEmail,
-	}
-
-	if existing, findErr := s.repo.FindUserByProvider(ctx, provider, profile.ProviderAccountID); findErr == nil {
-		user = existing
-		if err := s.repo.db.WithContext(ctx).Model(user).Updates(map[string]any{"name": name, "image": profile.Image}).Error; err != nil {
+	var user *models.User
+	if strings.TrimSpace(currentUserID) != "" {
+		linkedUser, err := s.repo.FindUserByProvider(ctx, provider, profile.ProviderAccountID)
+		if err == nil && linkedUser.ID != currentUserID {
+			return nil, errors.New("this provider account is already connected to another user")
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
-	} else if errors.Is(findErr, gorm.ErrRecordNotFound) {
-		if byEmail, emailErr := s.repo.FindUserByEmail(ctx, profile.Email); emailErr == nil {
-			user = byEmail
+
+		user, err = s.repo.FindUserByID(ctx, currentUserID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		usernameFromEmail := strings.Split(profile.Email, "@")[0] + "_" + randomString(6)
+
+		user = &models.User{
+			Name:     name,
+			Email:    profile.Email,
+			Image:    &profile.Image,
+			Username: usernameFromEmail,
+		}
+
+		if existing, findErr := s.repo.FindUserByProvider(ctx, provider, profile.ProviderAccountID); findErr == nil {
+			user = existing
 			if err := s.repo.db.WithContext(ctx).Model(user).Updates(map[string]any{"name": name, "image": profile.Image}).Error; err != nil {
 				return nil, err
 			}
-		} else if !errors.Is(emailErr, gorm.ErrRecordNotFound) {
-			return nil, emailErr
+		} else if errors.Is(findErr, gorm.ErrRecordNotFound) {
+			if byEmail, emailErr := s.repo.FindUserByEmail(ctx, profile.Email); emailErr == nil {
+				user = byEmail
+				if err := s.repo.db.WithContext(ctx).Model(user).Updates(map[string]any{"name": name, "image": profile.Image}).Error; err != nil {
+					return nil, err
+				}
+			} else if !errors.Is(emailErr, gorm.ErrRecordNotFound) {
+				return nil, emailErr
+			}
+		} else {
+			return nil, findErr
 		}
-	} else {
-		return nil, findErr
 	}
 
 	account := &models.OAuthAccount{

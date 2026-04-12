@@ -20,6 +20,7 @@ func NewController(service *Service) *Controller {
 
 func (ctl *Controller) Login(c *gin.Context) {
 	provider := c.Param("provider")
+	mode := normalizeOAuthMode(c.Query("mode"))
 	result, err := ctl.service.LoginURL(provider)
 	if err != nil {
 		response.Fail(c, http.StatusBadRequest, err.Error())
@@ -27,6 +28,7 @@ func (ctl *Controller) Login(c *gin.Context) {
 	}
 
 	ctl.setStateCookie(c, result.State)
+	ctl.setModeCookie(c, mode)
 	c.Redirect(http.StatusFound, result.AuthURL)
 }
 
@@ -35,12 +37,28 @@ func (ctl *Controller) Callback(c *gin.Context) {
 	state := c.Query("state")
 	code := c.Query("code")
 	stateCookie, err := c.Cookie("oauth_state")
+	mode := normalizeOAuthMode(cookieValue(c, "oauth_mode"))
 	if err != nil || state == "" || code == "" || stateCookie == "" || state != stateCookie {
 		response.Fail(c, http.StatusBadRequest, "invalid oauth state")
 		return
 	}
 
-	result, err := ctl.service.Callback(c.Request.Context(), provider, code)
+	defer ctl.clearOAuthCookies(c)
+
+	currentUserID := ""
+	if mode == "connect" {
+		currentUserID, err = ctl.currentUserID(c)
+		if err != nil {
+			response.Fail(c, http.StatusUnauthorized, err.Error())
+			return
+		}
+		if currentUserID == "" {
+			response.Fail(c, http.StatusUnauthorized, "sign in first to connect a provider")
+			return
+		}
+	}
+
+	result, err := ctl.service.Callback(c.Request.Context(), provider, code, currentUserID)
 	if err != nil {
 		response.Fail(c, http.StatusBadRequest, err.Error())
 		return
@@ -292,11 +310,55 @@ func (ctl *Controller) setStateCookie(c *gin.Context, state string) {
 	c.SetCookie("oauth_state", state, 300, "/", ctl.cookieDomain(), false, true)
 }
 
+func (ctl *Controller) setModeCookie(c *gin.Context, mode string) {
+	c.SetCookie("oauth_mode", normalizeOAuthMode(mode), 300, "/", ctl.cookieDomain(), false, true)
+}
+
+func (ctl *Controller) clearOAuthCookies(c *gin.Context) {
+	c.SetCookie("oauth_state", "", -1, "/", ctl.cookieDomain(), false, true)
+	c.SetCookie("oauth_mode", "", -1, "/", ctl.cookieDomain(), false, true)
+}
+
 func (ctl *Controller) clearCookies(c *gin.Context) {
 	c.SetCookie("openflag_token", "", -1, "/", ctl.cookieDomain(), false, true)
 	c.SetCookie("oauth_state", "", -1, "/", ctl.cookieDomain(), false, true)
+	c.SetCookie("oauth_mode", "", -1, "/", ctl.cookieDomain(), false, true)
 }
 
 func (ctl *Controller) cookieDomain() string {
 	return strings.TrimSpace(ctl.service.cfg.CookieDomain)
+}
+
+func (ctl *Controller) currentUserID(c *gin.Context) (string, error) {
+	token := cookieValue(c, "openflag_token")
+	if token == "" {
+		token = bearerToken(c)
+	}
+	if token == "" {
+		return "", nil
+	}
+
+	session, err := ctl.service.repo.FindValidSessionByToken(c.Request.Context(), token)
+	if err != nil {
+		return "", nil
+	}
+
+	return session.UserID, nil
+}
+
+func cookieValue(c *gin.Context, name string) string {
+	value, err := c.Cookie(name)
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(value)
+}
+
+func normalizeOAuthMode(mode string) string {
+	if strings.EqualFold(strings.TrimSpace(mode), "connect") {
+		return "connect"
+	}
+
+	return "login"
 }

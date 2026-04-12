@@ -125,3 +125,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 export function loginWithProvider(provider: "github" | "google") {
   window.location.assign(apiUrl(`/api/v1/auth/${provider}/login`));
 }
+
+export function connectWithProvider(provider: "github" | "google") {
+  window.location.assign(apiUrl(`/api/v1/auth/${provider}/login?mode=connect`));
+}

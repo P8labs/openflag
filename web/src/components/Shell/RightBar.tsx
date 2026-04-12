@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { loginWithProvider } from "@/context/auth-context";
+import { connectWithProvider } from "@/context/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { StreakHeatmap } from "./StreakHeatmap";
@@ -100,7 +100,7 @@ function ProfileCard() {
           <StatusPill
             label="GitHub"
             active={connections.githubConnected}
-            onConnect={() => loginWithProvider("github")}
+            onConnect={() => connectWithProvider("github")}
           />
           <StatusPill
             label="WakaTime"

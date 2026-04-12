@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { loginWithProvider, useAuth } from "@/context/auth-context";
+import { connectWithProvider, useAuth } from "@/context/auth-context";
 import { apiFetch } from "@/lib/api";
 import appConfig from "@/lib/config";
 import { projectStatusLabel, projectStatusOptions } from "@/lib/project-status";
@@ -483,7 +483,7 @@ export default function CreateProjectPage() {
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2"
-                onClick={() => loginWithProvider("github")}
+                onClick={() => connectWithProvider("github")}
               >
                 Connect
                 <FaGithub className="size-4" />

@@ -19,7 +19,7 @@ export default function AuthPage() {
               Terms
             </Link>
             and
-            <Link className="text-primary hover:underline mx-1" to="/privacy">
+            <Link className="text-primary hover:underline mx-1" to="/policy">
               Privacy Policy
             </Link>
           </p>
