@@ -137,3 +137,39 @@ type NotificationsResponse struct {
 	Notifications []NotificationItem `json:"notifications"`
 	UnreadCount   int                `json:"unreadCount"`
 }
+
+type ExploreUserItem struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Username  string   `json:"username"`
+	Image     *string  `json:"image,omitempty"`
+	Bio       *string  `json:"bio,omitempty"`
+	Skills    []string `json:"skills"`
+	Interests []string `json:"interests"`
+}
+
+type ExploreProjectItem struct {
+	ID        string   `json:"id"`
+	Title     string   `json:"title"`
+	Summary   string   `json:"summary"`
+	Status    string   `json:"status"`
+	Tags      []string `json:"tags"`
+	UpdatedAt string   `json:"updatedAt"`
+	Owner     struct {
+		ID        string   `json:"id"`
+		Name      string   `json:"name"`
+		Username  string   `json:"username"`
+		Image     *string  `json:"image,omitempty"`
+		Skills    []string `json:"skills"`
+		Interests []string `json:"interests"`
+	} `json:"owner"`
+}
+
+type ExploreResponse struct {
+	Query      string               `json:"query"`
+	Filter     string               `json:"filter"`
+	Projects   []ExploreProjectItem `json:"projects"`
+	Users      []ExploreUserItem    `json:"users"`
+	HasMore    bool                 `json:"hasMore"`
+	NextOffset int                  `json:"nextOffset"`
+}

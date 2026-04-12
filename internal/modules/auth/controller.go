@@ -89,6 +89,27 @@ func (ctl *Controller) Activity(c *gin.Context) {
 	response.Success(c, http.StatusOK, summary)
 }
 
+func (ctl *Controller) Explore(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		response.Fail(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	query := c.Query("q")
+	filter := c.Query("filter")
+	limit := parsePositiveInt(c.Query("limit"), 20, 100)
+	offset := parsePositiveInt(c.Query("offset"), 0, 0)
+
+	payload, err := ctl.service.Explore(c.Request.Context(), userID.(string), query, filter, limit, offset)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, payload)
+}
+
 func (ctl *Controller) PublicProfile(c *gin.Context) {
 	profile, err := ctl.service.PublicProfile(c.Request.Context(), c.Param("username"))
 	if err != nil {

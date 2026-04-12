@@ -13,10 +13,10 @@ export function FeedBoundary({
   projectsErrorMessage,
   feedLength,
 }: FeedBoundaryProps) {
-  const isLoading = postsLoading && projectsLoading;
+  const isLoading = postsLoading || projectsLoading;
   const hasAnyError = Boolean(postsErrorMessage || projectsErrorMessage);
 
-  if (isLoading) {
+  if (isLoading && feedLength === 0) {
     return (
       <p className="py-4 text-sm text-muted-foreground">Loading feed...</p>
     );

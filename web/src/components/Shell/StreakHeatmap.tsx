@@ -310,14 +310,14 @@ export function StreakHeatmap({
               </span>
             </div>
 
-            <div className="grid w-max grid-cols-7 gap-0.5">
+            <div className="grid grid-cols-7 gap-0.5">
               {activeMonth.days.map((day, index) => (
                 <span
                   key={day.date}
                   title={day.blank ? "" : `${day.date} • ${day.count} posts`}
                   aria-hidden={day.blank}
                   className={cn(
-                    "size-5",
+                    "aspect-square",
                     day.blank ? "bg-transparent" : getHeatmapTone(day.count),
                     getCellRoundClasses(index),
                   )}

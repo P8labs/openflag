@@ -18,10 +18,11 @@ func NewController(service *Service) *Controller {
 }
 
 func (ctl *Controller) List(c *gin.Context) {
+	query := c.Query("q")
 	limit := parsePositiveInt(c.Query("limit"), 0, 100)
 	offset := parsePositiveInt(c.Query("offset"), 0, 0)
 
-	projects, hasMore, err := ctl.service.List(c.Request.Context(), c.GetString("user_id"), limit, offset)
+	projects, hasMore, err := ctl.service.List(c.Request.Context(), c.GetString("user_id"), query, limit, offset)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, err.Error())
 		return

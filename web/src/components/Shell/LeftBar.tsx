@@ -5,7 +5,6 @@ import {
   FolderKanban,
   Home,
   LogOutIcon,
-  Sparkles,
   SquarePen,
   type LucideIcon,
 } from "lucide-react";
@@ -28,7 +27,7 @@ import { apiFetch } from "@/lib/api";
 const navItems = [
   { label: "Home", to: "/app", icon: Home },
   { label: "Explore", to: "/app/explore", icon: Compass },
-  { label: "Galaxy", to: "/app/galaxy", icon: Sparkles },
+  // { label: "Galaxy", to: "/app/galaxy", icon: Sparkles }, // NEEDED MORE WORK
   { label: "Projects", to: "/app/projects", icon: FolderKanban },
 ] as const;
 

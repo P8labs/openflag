@@ -58,8 +58,8 @@ func NewService(repo *Repository, db *gorm.DB) *Service {
 	}
 }
 
-func (s *Service) List(ctx context.Context, userID string, limit int, offset int) ([]models.Project, bool, error) {
-	projects, hasMore, err := s.repo.List(ctx, limit, offset)
+func (s *Service) List(ctx context.Context, userID string, searchQuery string, limit int, offset int) ([]models.Project, bool, error) {
+	projects, hasMore, err := s.repo.List(ctx, searchQuery, limit, offset)
 	if err != nil {
 		return nil, false, err
 	}

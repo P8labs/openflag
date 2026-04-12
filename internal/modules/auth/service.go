@@ -375,6 +375,136 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, input Update
 	return &MeResponse{User: updatedUser, Connections: connections}, nil
 }
 
+func (s *Service) Explore(ctx context.Context, userID string, query string, filter string, limit int, offset int) (*ExploreResponse, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	normalizedQuery := strings.TrimSpace(query)
+	normalizedFilter := strings.ToLower(strings.TrimSpace(filter))
+	if normalizedFilter == "" {
+		normalizedFilter = "all"
+	}
+
+	includeProjects := true
+	includeUsers := true
+	projectMode := "search"
+	userMode := "search"
+	terms := []string{}
+
+	if normalizedQuery == "" {
+		switch normalizedFilter {
+		case "projects":
+			includeUsers = false
+			projectMode = "trending"
+		case "users":
+			includeProjects = false
+			userMode = "trending"
+		case "recent":
+			projectMode = "recent"
+			userMode = "recent"
+		case "skill-match", "interest-match":
+			currentUser, err := s.repo.FindUserByID(ctx, userID)
+			if err != nil {
+				return nil, err
+			}
+
+			if normalizedFilter == "skill-match" {
+				terms = normalizeStringList([]string(currentUser.Skills))
+				projectMode = "skill-match"
+				userMode = "skill-match"
+			} else {
+				terms = normalizeStringList([]string(currentUser.Interests))
+				projectMode = "interest-match"
+				userMode = "interest-match"
+			}
+
+			if len(terms) == 0 {
+				projectMode = "trending"
+				userMode = "trending"
+			}
+		default:
+			projectMode = "trending"
+			userMode = "trending"
+		}
+	} else {
+		switch normalizedFilter {
+		case "projects":
+			includeUsers = false
+		case "users":
+			includeProjects = false
+		}
+	}
+
+	response := &ExploreResponse{
+		Query:      normalizedQuery,
+		Filter:     normalizedFilter,
+		Projects:   []ExploreProjectItem{},
+		Users:      []ExploreUserItem{},
+		HasMore:    false,
+		NextOffset: offset,
+	}
+
+	if includeProjects {
+		projects, hasMore, err := s.repo.ListExploreProjects(ctx, normalizedQuery, projectMode, terms, limit, offset)
+		if err != nil {
+			return nil, err
+		}
+		response.HasMore = response.HasMore || hasMore
+
+		response.Projects = make([]ExploreProjectItem, 0, len(projects))
+		for _, project := range projects {
+			item := ExploreProjectItem{
+				ID:        project.ID,
+				Title:     project.Title,
+				Summary:   project.Summary,
+				Status:    project.Status,
+				Tags:      []string(project.Tags),
+				UpdatedAt: project.UpdatedAt.UTC().Format(time.RFC3339),
+			}
+
+			item.Owner.ID = project.Owner.ID
+			item.Owner.Name = project.Owner.Name
+			item.Owner.Username = project.Owner.Username
+			item.Owner.Image = project.Owner.Image
+			item.Owner.Skills = []string(project.Owner.Skills)
+			item.Owner.Interests = []string(project.Owner.Interests)
+
+			response.Projects = append(response.Projects, item)
+		}
+	}
+
+	if includeUsers {
+		users, hasMore, err := s.repo.ListExploreUsers(ctx, normalizedQuery, userMode, terms, limit, offset)
+		if err != nil {
+			return nil, err
+		}
+		response.HasMore = response.HasMore || hasMore
+
+		response.Users = make([]ExploreUserItem, 0, len(users))
+		for _, user := range users {
+			response.Users = append(response.Users, ExploreUserItem{
+				ID:        user.ID,
+				Name:      user.Name,
+				Username:  user.Username,
+				Image:     user.Image,
+				Bio:       user.Bio,
+				Skills:    []string(user.Skills),
+				Interests: []string(user.Interests),
+			})
+		}
+	}
+
+	if response.HasMore {
+		response.NextOffset = offset + limit
+	}
+
+	return response, nil
+}
+
 func (s *Service) Notifications(ctx context.Context, userID string, limit int, offset int) (*NotificationsResponse, error) {
 	notifications, err := s.repo.ListNotifications(ctx, userID, limit, offset)
 	if err != nil {

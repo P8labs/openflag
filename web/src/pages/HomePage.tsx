@@ -30,8 +30,8 @@ export default function HomePage() {
   >({});
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const queryClient = useQueryClient();
-  const PAGE_SIZE_POSTS = 12;
-  const PAGE_SIZE_PROJECTS = 8;
+  const PAGE_SIZE_POSTS = 10;
+  const PAGE_SIZE_PROJECTS = 5;
 
   const postsQuery = useInfiniteQuery({
     queryKey: HOME_POSTS_QUERY_KEY,
@@ -221,7 +221,7 @@ export default function HomePage() {
           feedLength={feed.length}
         />
 
-        {!isLoading && feed.length > 0 ? (
+        {feed.length > 0 ? (
           <ul className="divide-y divide-border">
             {feed.map((item) => {
               if (item.type === "project") {
@@ -309,12 +309,12 @@ export default function HomePage() {
           </ul>
         ) : null}
 
-        {!isLoading && canLoadMore ? (
+        {canLoadMore || (isLoading && feed.length > 0) ? (
           <div
             ref={loadMoreRef}
             className="py-4 text-center text-xs text-muted-foreground"
           >
-            Loading more updates...
+            {isLoading ? "Loading updates..." : "Loading more updates..."}
           </div>
         ) : null}
       </section>

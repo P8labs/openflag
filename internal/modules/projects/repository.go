@@ -2,6 +2,7 @@ package projects
 
 import (
 	"context"
+	"strings"
 
 	"openflag/internal/models"
 
@@ -16,11 +17,22 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) List(ctx context.Context, limit int, offset int) ([]models.Project, bool, error) {
+func (r *Repository) List(ctx context.Context, searchQuery string, limit int, offset int) ([]models.Project, bool, error) {
 	var projects []models.Project
 	query := r.db.WithContext(ctx).
 		Preload("Owner").
 		Order("created_at desc")
+
+	normalizedQuery := strings.TrimSpace(strings.ToLower(searchQuery))
+	if normalizedQuery != "" {
+		like := "%" + normalizedQuery + "%"
+		query = query.Where(
+			"LOWER(title) LIKE ? OR LOWER(summary) LIKE ? OR LOWER(COALESCE(array_to_string(tags, ' '), '')) LIKE ?",
+			like,
+			like,
+			like,
+		)
+	}
 
 	hasMore := false
 	if limit > 0 {

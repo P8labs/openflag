@@ -42,10 +42,6 @@ function ProfileCard() {
   return (
     <section className="w-full space-y-3">
       <header className="space-y-3">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Profile
-        </p>
-
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Avatar className="size-12 border border-border">
@@ -93,12 +89,6 @@ function ProfileCard() {
         title="Skills"
         emptyText="No skills selected yet."
         items={user.skills}
-      />
-
-      <TagSection
-        title="Interests"
-        emptyText="No interests selected yet."
-        items={user.interests}
       />
 
       <div className="space-y-3 border-t border-border pt-4">

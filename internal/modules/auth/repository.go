@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"openflag/internal/models"
@@ -237,4 +238,160 @@ func (r *Repository) MarkAllNotificationsRead(ctx context.Context, userID string
 		Model(&models.Notification{}).
 		Where("user_id = ? AND read_at IS NULL", userID).
 		Update("read_at", now).Error
+}
+
+func (r *Repository) ListExploreProjects(ctx context.Context, query string, mode string, terms []string, limit int, offset int) ([]models.Project, bool, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	db := r.db.WithContext(ctx).
+		Model(&models.Project{}).
+		Joins("LEFT JOIN users ON users.id = projects.owner_id").
+		Preload("Owner")
+
+	switch mode {
+	case "trending":
+		db = db.Order("COALESCE((SELECT COUNT(1) FROM posts WHERE posts.project_id = projects.id), 0) DESC, projects.updated_at DESC")
+	case "recent":
+		db = db.Order("projects.updated_at DESC")
+	case "skill-match", "interest-match":
+		db = db.Order("projects.updated_at DESC")
+		db = applyProjectTermFilter(db, terms)
+	default:
+		db = db.Order("projects.updated_at DESC")
+		db = applyProjectQueryFilter(db, query)
+	}
+
+	var projects []models.Project
+	if err := db.Offset(offset).Limit(limit + 1).Find(&projects).Error; err != nil {
+		return nil, false, err
+	}
+
+	hasMore := false
+	if len(projects) > limit {
+		hasMore = true
+		projects = projects[:limit]
+	}
+
+	return projects, hasMore, nil
+}
+
+func (r *Repository) ListExploreUsers(ctx context.Context, query string, mode string, terms []string, limit int, offset int) ([]models.User, bool, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	db := r.db.WithContext(ctx).
+		Model(&models.User{}).
+		Where("users.username <> ''")
+
+	switch mode {
+	case "trending":
+		db = db.Order("COALESCE((SELECT SUM(count) FROM user_activities WHERE user_activities.user_id = users.id), 0) DESC, users.updated_at DESC")
+	case "recent":
+		db = db.Order("users.updated_at DESC")
+	case "skill-match":
+		db = db.Order("users.updated_at DESC")
+		db = applyUserTermFilter(db, terms, "skills")
+	case "interest-match":
+		db = db.Order("users.updated_at DESC")
+		db = applyUserTermFilter(db, terms, "interests")
+	default:
+		db = db.Order("users.updated_at DESC")
+		db = applyUserQueryFilter(db, query)
+	}
+
+	var users []models.User
+	if err := db.Offset(offset).Limit(limit + 1).Find(&users).Error; err != nil {
+		return nil, false, err
+	}
+
+	hasMore := false
+	if len(users) > limit {
+		hasMore = true
+		users = users[:limit]
+	}
+
+	return users, hasMore, nil
+}
+
+func applyProjectQueryFilter(db *gorm.DB, query string) *gorm.DB {
+	pattern := "%" + strings.ToLower(strings.TrimSpace(query)) + "%"
+	if pattern == "%%" {
+		return db
+	}
+
+	return db.Where(
+		"LOWER(projects.title) LIKE ? OR LOWER(projects.summary) LIKE ? OR EXISTS (SELECT 1 FROM unnest(projects.tags) AS tag WHERE LOWER(tag) LIKE ?) OR LOWER(users.name) LIKE ? OR LOWER(users.username) LIKE ?",
+		pattern,
+		pattern,
+		pattern,
+		pattern,
+		pattern,
+	)
+}
+
+func applyProjectTermFilter(db *gorm.DB, terms []string) *gorm.DB {
+	clauses := make([]string, 0, len(terms))
+	args := make([]any, 0, len(terms)*5)
+
+	for _, term := range terms {
+		pattern := "%" + strings.ToLower(strings.TrimSpace(term)) + "%"
+		if pattern == "%%" {
+			continue
+		}
+
+		clauses = append(clauses, "(LOWER(projects.title) LIKE ? OR LOWER(projects.summary) LIKE ? OR EXISTS (SELECT 1 FROM unnest(projects.tags) AS tag WHERE LOWER(tag) LIKE ?) OR LOWER(users.name) LIKE ? OR LOWER(users.username) LIKE ?)")
+		args = append(args, pattern, pattern, pattern, pattern, pattern)
+	}
+
+	if len(clauses) == 0 {
+		return db.Where("1 = 0")
+	}
+
+	return db.Where(strings.Join(clauses, " OR "), args...)
+}
+
+func applyUserQueryFilter(db *gorm.DB, query string) *gorm.DB {
+	pattern := "%" + strings.ToLower(strings.TrimSpace(query)) + "%"
+	if pattern == "%%" {
+		return db
+	}
+
+	return db.Where(
+		"LOWER(users.name) LIKE ? OR LOWER(users.username) LIKE ? OR LOWER(COALESCE(users.bio, '')) LIKE ? OR EXISTS (SELECT 1 FROM unnest(users.skills) AS skill WHERE LOWER(skill) LIKE ?) OR EXISTS (SELECT 1 FROM unnest(users.interests) AS interest WHERE LOWER(interest) LIKE ?)",
+		pattern,
+		pattern,
+		pattern,
+		pattern,
+		pattern,
+	)
+}
+
+func applyUserTermFilter(db *gorm.DB, terms []string, arrayColumn string) *gorm.DB {
+	clauses := make([]string, 0, len(terms))
+	args := make([]any, 0, len(terms)*3)
+
+	for _, term := range terms {
+		pattern := "%" + strings.ToLower(strings.TrimSpace(term)) + "%"
+		if pattern == "%%" {
+			continue
+		}
+
+		clauses = append(clauses, "(LOWER(users.name) LIKE ? OR LOWER(users.username) LIKE ? OR EXISTS (SELECT 1 FROM unnest(users."+arrayColumn+") AS value WHERE LOWER(value) LIKE ?))")
+		args = append(args, pattern, pattern, pattern)
+	}
+
+	if len(clauses) == 0 {
+		return db.Where("1 = 0")
+	}
+
+	return db.Where(strings.Join(clauses, " OR "), args...)
 }

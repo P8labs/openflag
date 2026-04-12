@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Filter, Plus, Search } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -23,31 +23,39 @@ type ProjectListItem = {
 
 export default function ManageProjectsPage() {
   const navigate = useNavigate();
+  const PAGE_SIZE = 5;
 
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+
+  const normalizedQuery = query.trim();
+  const offset = (page - 1) * PAGE_SIZE;
 
   const projectsQuery = useQuery({
-    queryKey: ["projects"],
-    queryFn: () =>
-      apiFetch<{ projects: ProjectListItem[] }>("/api/v1/projects"),
+    queryKey: ["projects", normalizedQuery, page],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(offset));
+      if (normalizedQuery) {
+        params.set("q", normalizedQuery);
+      }
+
+      return apiFetch<{
+        projects: ProjectListItem[];
+        hasMore: boolean;
+        nextOffset: number;
+      }>(`/api/v1/projects?${params.toString()}`);
+    },
+    placeholderData: (previousData) => previousData,
   });
 
   const projects = projectsQuery.data?.projects ?? [];
+  const hasMore = projectsQuery.data?.hasMore ?? false;
 
-  const filteredProjects = useMemo(() => {
-    return projects.filter((project) => {
-      const tags = project.tags ?? [];
-
-      const normalizedQuery = query.trim().toLowerCase();
-      const byQuery =
-        normalizedQuery.length === 0 ||
-        project.title.toLowerCase().includes(normalizedQuery) ||
-        project.summary.toLowerCase().includes(normalizedQuery) ||
-        tags.some((tag) => tag.toLowerCase().includes(normalizedQuery));
-
-      return byQuery;
-    });
-  }, [projects, query]);
+  useEffect(() => {
+    setPage(1);
+  }, [query]);
 
   return (
     <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-3 py-6 lg:px-6 lg:py-8">
@@ -117,7 +125,7 @@ export default function ManageProjectsPage() {
 
         {!projectsQuery.isLoading &&
         !projectsQuery.isError &&
-        filteredProjects.length === 0 ? (
+        projects.length === 0 ? (
           <div className="rounded-md border border-border bg-background/60 px-4 py-8 text-sm text-muted-foreground">
             No projects match your filters.
           </div>
@@ -125,9 +133,9 @@ export default function ManageProjectsPage() {
 
         {!projectsQuery.isLoading &&
         !projectsQuery.isError &&
-        filteredProjects.length > 0 ? (
+        projects.length > 0 ? (
           <ul className="divide-y divide-border rounded-md border border-border bg-background/50">
-            {filteredProjects.map((project) => (
+            {projects.map((project) => (
               <li key={project.id} className="px-4 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -166,6 +174,34 @@ export default function ManageProjectsPage() {
               </li>
             ))}
           </ul>
+        ) : null}
+
+        {!projectsQuery.isLoading &&
+        !projectsQuery.isError &&
+        projects.length > 0 ? (
+          <div className="flex items-center justify-between border-t border-border pt-3">
+            <p className="text-xs text-muted-foreground">Page {page}</p>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((current) => Math.max(current - 1, 1))}
+              >
+                Previous
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!hasMore}
+                onClick={() => setPage((current) => current + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         ) : null}
       </section>
     </section>

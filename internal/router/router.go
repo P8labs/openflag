@@ -65,6 +65,7 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 		protected.Use(middleware.RequireAuth(authRepo))
 		{
 			protected.GET("/me", authController.Me)
+			protected.GET("/explore", authController.Explore)
 			protected.PATCH("/me/profile", authController.UpdateProfile)
 			protected.GET("/me/activity", authController.Activity)
 			protected.GET("/me/notifications", authController.Notifications)
