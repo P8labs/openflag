@@ -1,0 +1,85 @@
+name: Release API Binary
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (SemVer, e.g. 1.2.3)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Resolve version
+        id: version
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version: $VERSION"
+            exit 1
+          fi
+
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build Linux AMD64 binary
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          COMMIT_SHA="${GITHUB_SHA::7}"
+
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build \
+              -trimpath \
+              -ldflags "-s -w -X openflag/internal/version.Version=${VERSION} -X openflag/internal/version.Commit=${COMMIT_SHA} -X openflag/internal/version.BuildDate=${BUILD_DATE}" \
+              -o "dist/openflag-api-linux-amd64" \
+              ./cmd/api
+
+          (cd dist && sha256sum openflag-api-linux-amd64 > openflag-api-linux-amd64.sha256)
+
+      - name: Upload build artifact (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openflag-api-linux-amd64-v${{ steps.version.outputs.value }}
+          path: |
+            dist/openflag-api-linux-amd64
+            dist/openflag-api-linux-amd64.sha256
+
+      - name: Create GitHub release and upload assets (tag runs)
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.value }}
+          name: Openflag API v${{ steps.version.outputs.value }}
+          files: |
+            dist/openflag-api-linux-amd64
+            dist/openflag-api-linux-amd64.sha256

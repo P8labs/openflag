@@ -1,4 +1,6 @@
 export { default as LandingPage } from "./LandingPage";
+export { default as PolicyPage } from "./PolicyPage";
+export { default as TermsPage } from "./TermsPage";
 export { default as ManifestoPage } from "./ManifestoPage";
 export { default as AuthPage } from "./AuthPage";
 export { default as OnboardPage } from "./OnboardPage";

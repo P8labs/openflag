@@ -1,61 +1,61 @@
-# Openflag Go API Server
+# Openflag
 
-This repository now includes a Go API server that mirrors the data model from the Next.js app and keeps the code organized by feature.
+Openflag is a simple social app but not like normal social media. It is made for people who actually build things developers, designers, makers and want to show real work instead of just posting random content.
 
-## Structure
+Most platforms are full of noise, likes, followers, and fake productivity. Here idea is different. Here you show **proof of work**, not just say “I am working”.
 
-- `cmd/api` - executable entrypoint
-- `internal/config` - environment loading
-- `internal/database` - Gorm connection and migrations
-- `internal/modules/auth` - GitHub and Google OAuth login
-- `internal/modules/projects` - project CRUD
-- `internal/modules/posts` - post CRUD with project linking
-- `internal/modules/comments` - comment CRUD with post linking
-- `internal/middleware` - JWT auth guard
-- `internal/models` - shared Gorm models
+Live: https://openflag.xyz
 
-## API
+## Why Openflag
 
-Base path: `/api/v1`
+Right now if you see:
 
-Auth:
+- Twitter → too much noise
+- LinkedIn → mostly fake polished posts
+- GitHub → good work but no social discovery
 
-- `GET /auth/:provider/login`
-- `GET /auth/:provider/callback`
-- `GET /api/v1/me`
-- `POST /auth/logout`
+There is no place where:
 
-Projects:
+- you can show what you are building
+- attach real proof (PRs, commits, time spent)
+- and find people who are actually doing work
 
-- `GET /projects`
-- `POST /projects`
-- `GET /projects/:id`
-- `PATCH /projects/:id`
-- `DELETE /projects/:id`
+Openflag is trying to solve this.
 
-Posts:
+It is not about followers.
+It is about **signal > noise**.
 
-- `GET /posts`
-- `POST /posts`
-- `GET /posts/:id`
-- `PATCH /posts/:id`
-- `DELETE /posts/:id`
+## What you can do
 
-Comments:
+- Create profile with your skills and interests
+- Add projects you are working on
+- Post updates with proof (PRs, commits, wakatime, or text/image)
+- Like and comment on posts
 
-- `GET /posts/:postId/comments`
-- `POST /posts/:postId/comments`
-- `PATCH /comments/:id`
-- `DELETE /comments/:id`
+Everything is focused on showing real work.
 
-## Run
+## Philosophy
 
-1. Copy `.env.example` to `.env` and fill in the OAuth and database values.
-2. Start Postgres locally.
-3. Run the server:
+Openflag is built on one idea:
 
-```bash
-go run ./cmd/api
-```
+> If you are building, it should be visible.
 
-The server listens on `PORT` and auto-migrates the schema on startup.
+And if you are not building, no need to pretend.
+
+## Current state
+
+This is MVP right now.
+
+Only focus:
+
+- projects
+- posts with proof
+- basic interaction
+
+More things can come later, but only if they support real work.
+
+## Final
+
+If you are someone who actually builds things, this will make sense.
+
+If you just want to scroll, maybe not.

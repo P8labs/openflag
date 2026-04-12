@@ -12,7 +12,9 @@ import {
   NotFoundPage,
   NotificationsPage,
   OnboardPage,
+  PolicyPage,
   ProjectDetailPage,
+  TermsPage,
   UserProfilePage,
 } from "./pages";
 
@@ -35,6 +37,8 @@ export default function App() {
         <AuthGate>
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/policy" element={<PolicyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/auth/callback" element={<CallbackPage />} />
             <Route path="/onboard" element={<OnboardPage />} />

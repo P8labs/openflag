@@ -3,7 +3,6 @@ function getENV(key: string, defaultValue: string = ""): string {
   if (value === undefined) {
     return defaultValue;
   }
-  console.log(`Environment variable ${key} is set to: ${value}`);
   return value;
 }
 

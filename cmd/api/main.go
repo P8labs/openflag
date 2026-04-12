@@ -1,21 +1,26 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 
 	"openflag/internal/config"
 	"openflag/internal/database"
 	"openflag/internal/router"
-
-	"github.com/joho/godotenv"
+	"openflag/internal/version"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	showVersion := flag.Bool("version", false, "print build version and exit")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version.String())
+		return
 	}
+
 	cfg := config.Load()
 	db, err := database.Open(cfg)
 	if err != nil {
