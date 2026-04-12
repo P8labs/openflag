@@ -10,6 +10,7 @@ import (
 	"openflag/internal/modules/posts"
 	"openflag/internal/modules/projects"
 	"openflag/internal/response"
+	"openflag/internal/version"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -31,6 +32,16 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		AllowCredentials: true,
 	}))
+
+	r.GET("/", func(c *gin.Context) {
+		response.Success(c, http.StatusOK, gin.H{
+			"ok":        true,
+			"service":   "openflag-api",
+			"version":   version.Version,
+			"commit":    version.Commit,
+			"buildDate": version.BuildDate,
+		})
+	})
 
 	r.GET("/healthz", func(c *gin.Context) {
 		response.Success(c, http.StatusOK, gin.H{"ok": true})

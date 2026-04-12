@@ -359,9 +359,10 @@ func (s *Service) StarGitHubProject(ctx context.Context, userID string, projectI
 	}
 
 	if project.OwnerID != userID {
+		actorID := userID
 		_ = s.db.WithContext(ctx).Create(&models.Notification{
 			UserID:     project.OwnerID,
-			ActorID:    userID,
+			ActorID:    &actorID,
 			Type:       "project_starred",
 			Message:    "starred your project",
 			EntityType: "project",

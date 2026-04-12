@@ -213,7 +213,7 @@ func (a *UserActivity) BeforeCreate(_ *gorm.DB) error {
 type Notification struct {
 	ID         string     `gorm:"primaryKey;size:36" json:"id"`
 	UserID     string     `gorm:"index;not null" json:"userId"`
-	ActorID    string     `gorm:"index;not null" json:"actorId"`
+	ActorID    *string    `gorm:"index" json:"actorId,omitempty"`
 	Type       string     `gorm:"type:text;not null" json:"type"`
 	Message    string     `gorm:"type:text;not null" json:"message"`
 	EntityType string     `gorm:"type:text;not null" json:"entityType"`
@@ -222,8 +222,8 @@ type Notification struct {
 	CreatedAt  time.Time  `json:"createdAt"`
 	UpdatedAt  time.Time  `json:"updatedAt"`
 
-	User  User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE;" json:"user,omitempty"`
-	Actor User `gorm:"foreignKey:ActorID;references:ID;constraint:OnDelete:CASCADE;" json:"actor,omitempty"`
+	User  User  `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE;" json:"user,omitempty"`
+	Actor *User `gorm:"foreignKey:ActorID;references:ID;constraint:OnDelete:SET NULL;" json:"actor,omitempty"`
 }
 
 func (n *Notification) BeforeCreate(_ *gorm.DB) error {

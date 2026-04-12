@@ -249,9 +249,10 @@ func (s *Service) ToggleLike(ctx context.Context, id string, userID string) (*mo
 		liked = true
 		if postOwner, findErr := s.repo.FindByID(ctx, id); findErr == nil {
 			if postOwner.AuthorID != userID {
+				actorID := userID
 				_ = s.db.WithContext(ctx).Create(&models.Notification{
 					UserID:     postOwner.AuthorID,
-					ActorID:    userID,
+					ActorID:    &actorID,
 					Type:       "post_liked",
 					Message:    "liked your post",
 					EntityType: "post",

@@ -274,7 +274,7 @@ export function StreakHeatmap({
             </Button>
           </div>
 
-          <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto pb-1">
+          {/* <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto pb-1">
             {monthGroups.map((month) => {
               const isActive = month.key === activeMonth?.key;
 
@@ -294,7 +294,7 @@ export function StreakHeatmap({
                 </button>
               );
             })}
-          </div>
+          </div> */}
         </div>
 
         {activeMonth ? (

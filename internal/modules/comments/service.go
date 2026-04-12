@@ -65,9 +65,10 @@ func (s *Service) Create(ctx context.Context, postID, userID string, input Creat
 	}
 
 	if post.AuthorID != userID {
+		actorID := userID
 		_ = s.db.WithContext(ctx).Create(&models.Notification{
 			UserID:     post.AuthorID,
-			ActorID:    userID,
+			ActorID:    &actorID,
 			Type:       "post_commented",
 			Message:    "commented on your post",
 			EntityType: "post",

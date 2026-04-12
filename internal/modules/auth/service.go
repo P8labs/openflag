@@ -551,10 +551,12 @@ func (s *Service) Notifications(ctx context.Context, userID string, limit int, o
 			item.ReadAt = &value
 		}
 
-		item.Actor.ID = notification.Actor.ID
-		item.Actor.Name = notification.Actor.Name
-		item.Actor.Username = notification.Actor.Username
-		item.Actor.Image = notification.Actor.Image
+		if notification.Actor != nil {
+			item.Actor.ID = notification.Actor.ID
+			item.Actor.Name = notification.Actor.Name
+			item.Actor.Username = notification.Actor.Username
+			item.Actor.Image = notification.Actor.Image
+		}
 
 		response.Notifications = append(response.Notifications, item)
 	}
