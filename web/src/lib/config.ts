@@ -13,7 +13,7 @@ function getEnvBool(key: string, defaultValue: boolean = false): boolean {
 
 const appConfig = {
   API_BASE_URL: getENV("VITE_API_BASE_URL", "http://localhost:8080"),
-  MANIFESTO_MODE: getEnvBool("VITE_MANIFESTO_MODE", true),
+  MANIFESTO_MODE: getEnvBool("VITE_MANIFESTO_MODE", false),
   PROJECT_URL_AUTOFILL_ENABLED: getEnvBool(
     "VITE_PROJECT_URL_AUTOFILL_ENABLED",
     false,
