@@ -54,7 +54,7 @@ func parsePositiveInt(raw string, fallback int, max int) int {
 }
 
 func (ctl *Controller) Get(c *gin.Context) {
-	project, err := ctl.service.Get(c.Request.Context(), c.Param("id"))
+	project, err := ctl.service.GetForUser(c.Request.Context(), c.Param("id"), c.GetString("user_id"))
 	if err != nil {
 		status := http.StatusInternalServerError
 		if err == ErrProjectNotFound {
@@ -129,6 +129,8 @@ func (ctl *Controller) TrackedTime(c *gin.Context) {
 		status := http.StatusBadRequest
 		if err == ErrProjectNotFound {
 			status = http.StatusNotFound
+		} else if err == ErrProjectForbidden {
+			status = http.StatusForbidden
 		}
 		response.Fail(c, status, err.Error())
 		return

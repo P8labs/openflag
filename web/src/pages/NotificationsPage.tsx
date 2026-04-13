@@ -29,7 +29,7 @@ type NotificationsResponse = {
 
 function targetHref(item: NotificationItem) {
   if (item.entityType === "post") {
-    return "/app";
+    return `/app?postId=${item.entityId}`;
   }
   if (item.entityType === "project") {
     return `/app/projects/${item.entityId}`;

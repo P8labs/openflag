@@ -4,6 +4,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 
 import { FeedBoundary } from "@/components/feed/FeedBoundary";
 import { PostFeedItem } from "@/components/feed/PostFeedItem";
@@ -20,6 +21,7 @@ export default function HomePage() {
   const HOME_POSTS_QUERY_KEY = ["home-feed", "posts"] as const;
   const HOME_PROJECTS_QUERY_KEY = ["home-feed", "projects"] as const;
   const { openComposer } = usePostComposer();
+  const location = useLocation();
   const { user, connections } = useAuth();
   const [commentPanel, setCommentPanel] = useState<Record<string, boolean>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>(
@@ -97,6 +99,11 @@ export default function HomePage() {
   const canLoadMore =
     Boolean(postsQuery.hasNextPage) || Boolean(projectsQuery.hasNextPage);
 
+  const deepLinkedPostID = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("postId")?.trim() ?? "";
+  }, [location.search]);
+
   useEffect(() => {
     const node = loadMoreRef.current;
     if (!node || !canLoadMore) {
@@ -137,6 +144,28 @@ export default function HomePage() {
     projectsQuery.hasNextPage,
     projectsQuery.isFetchingNextPage,
   ]);
+
+  useEffect(() => {
+    if (!deepLinkedPostID) {
+      return;
+    }
+
+    const target = document.getElementById(`post-${deepLinkedPostID}`);
+    if (!target) {
+      return;
+    }
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("ring-1", "ring-primary/40", "rounded-md");
+    const timeout = window.setTimeout(() => {
+      target.classList.remove("ring-1", "ring-primary/40", "rounded-md");
+    }, 1800);
+
+    return () => {
+      window.clearTimeout(timeout);
+      target.classList.remove("ring-1", "ring-primary/40", "rounded-md");
+    };
+  }, [deepLinkedPostID, feed.length]);
 
   const likeMutation = useMutation({
     mutationFn: (postID: string) =>

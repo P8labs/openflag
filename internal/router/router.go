@@ -7,6 +7,7 @@ import (
 	"openflag/internal/middleware"
 	authmodule "openflag/internal/modules/auth"
 	"openflag/internal/modules/comments"
+	"openflag/internal/modules/media"
 	"openflag/internal/modules/posts"
 	"openflag/internal/modules/projects"
 	"openflag/internal/response"
@@ -50,13 +51,16 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 	authRepo := authmodule.NewRepository(db)
 	authService := authmodule.NewService(authRepo, cfg)
 	authController := authmodule.NewController(authService)
+	mediaRepo := media.NewRepository(db)
+	mediaService := media.NewService(mediaRepo, cfg)
+	mediaController := media.NewController(mediaService)
 
 	projectRepo := projects.NewRepository(db)
-	projectService := projects.NewService(projectRepo, db)
+	projectService := projects.NewService(projectRepo, db, mediaService)
 	projectController := projects.NewController(projectService)
 
 	postRepo := posts.NewRepository(db)
-	postService := posts.NewService(postRepo, projectService, db)
+	postService := posts.NewService(postRepo, projectService, mediaService, db)
 	postController := posts.NewController(postService)
 
 	commentRepo := comments.NewRepository(db)
@@ -85,6 +89,7 @@ func New(cfg config.Config, db *gorm.DB) *gin.Engine {
 			protected.GET("/users/:username/profile", authController.PublicProfile)
 			protected.GET("/me/wakatime/projects", authController.WakaTimeProjects)
 			protected.POST("/me/onboarding/step", authController.CompleteOnboardingStep)
+			protected.POST("/uploads/image", mediaController.UploadImage)
 			protected.GET("/projects", projectController.List)
 			protected.POST("/projects", projectController.Create)
 			protected.GET("/projects/:id", projectController.Get)

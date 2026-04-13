@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { RichText } from "@/components/ui/rich-text";
 import { cn, formatDuration } from "@/lib/utils";
 
 import { PostCommentsThread } from "./PostCommentsThread";
@@ -65,7 +66,7 @@ export function PostFeedItem({
     commentPanelOpen ?? shouldAutoOpenComments(post.id, commentCount);
 
   return (
-    <li key={id} className="space-y-3 py-4">
+    <li id={id} key={id} className="space-y-3 py-4 scroll-mt-24">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <Avatar className="mt-0.5 size-10 border border-border">
@@ -104,9 +105,20 @@ export function PostFeedItem({
         </div>
       </div>
 
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-        {post.content}
-      </p>
+      <RichText
+        text={post.content}
+        className="whitespace-pre-wrap text-sm leading-relaxed text-foreground"
+      />
+
+      {post.image && (
+        <div className="relative mt-2 aspect-video w-full overflow-hidden rounded-md">
+          <img
+            src={post.image}
+            alt="Post image"
+            className="h-full w-full object-cover"
+          />
+        </div>
+      )}
 
       {quizOptions ? (
         <section className="space-y-3">

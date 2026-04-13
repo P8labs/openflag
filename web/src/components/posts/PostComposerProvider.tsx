@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -24,9 +25,11 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { apiFetch } from "@/lib/api";
 import {
   createPostComposerSchema,
@@ -96,6 +99,17 @@ type GitHubSuggestionOption = {
   type: "pr" | "issue";
   value: string;
   label: string;
+};
+
+type MentionUser = {
+  id: string;
+  username: string;
+  name: string;
+  image?: string | null;
+};
+
+type MentionUsersResponse = {
+  users: MentionUser[];
 };
 
 const categoryMeta = {
@@ -283,6 +297,11 @@ function PostComposerModal({
   const [quizOptions, setQuizOptions] = useState(["", "", "", ""]);
   const [shouldRender, setShouldRender] = useState(state.open);
   const [isClosing, setIsClosing] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionStart, setMentionStart] = useState<number | null>(null);
+  const [mentionEnd, setMentionEnd] = useState<number | null>(null);
+  const [mentionHighlightIndex, setMentionHighlightIndex] = useState(0);
+  const contentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const projectsQuery = useQuery({
     queryKey: ["projects"],
@@ -307,7 +326,7 @@ function PostComposerModal({
       category: "devlog",
       projectId: "",
       quiz: "",
-      imageUrl: "",
+      image: "",
       githubUrl: "",
       refUrls: [],
       wakatimeProjectIds: [],
@@ -347,6 +366,20 @@ function PostComposerModal({
     staleTime: 60_000,
   });
 
+  const mentionUsersQuery = useQuery({
+    queryKey: ["mention-users", mentionQuery],
+    queryFn: () =>
+      apiFetch<MentionUsersResponse>(
+        `/api/v1/explore?filter=users&q=${encodeURIComponent(mentionQuery)}&limit=8&offset=0`,
+      ),
+    enabled:
+      state.open &&
+      mentionStart !== null &&
+      mentionEnd !== null &&
+      mentionQuery.trim().length > 0,
+    staleTime: 20_000,
+  });
+
   const refSuggestions = useMemo<GitHubSuggestionOption[]>(() => {
     const pullRequests = (githubReferencesQuery.data?.references.prs ?? []).map(
       (pr) => ({
@@ -369,6 +402,16 @@ function PostComposerModal({
     githubReferencesQuery.data?.references.prs,
     githubReferencesQuery.data?.references.issues,
   ]);
+
+  const mentionSuggestions = mentionUsersQuery.data?.users ?? [];
+  const mentionOpen =
+    mentionStart !== null &&
+    mentionEnd !== null &&
+    mentionSuggestions.length > 0;
+
+  useEffect(() => {
+    setMentionHighlightIndex(0);
+  }, [mentionQuery, mentionSuggestions.length]);
 
   useEffect(() => {
     if (!selectedProject?.githubUrl) {
@@ -401,7 +444,7 @@ function PostComposerModal({
               payload.category === "ask"
                 ? buildAskQuizPayload(payload.content, quizOptions)
                 : "",
-            image: payload.imageUrl?.trim() || "",
+            image: payload.image?.trim() || "",
             githubUrl:
               payload.category === "devlog"
                 ? payload.githubUrl?.trim() || ""
@@ -422,6 +465,7 @@ function PostComposerModal({
     onSuccess: async (_data, payload) => {
       await queryClient.invalidateQueries({ queryKey: ["posts"] });
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      await queryClient.invalidateQueries({ queryKey: ["home-feed"] });
       const linkedProjectId = payload.projectId?.trim();
       if (payload.category === "devlog" && linkedProjectId) {
         await queryClient.invalidateQueries({
@@ -436,13 +480,16 @@ function PostComposerModal({
         category: "devlog",
         projectId: "",
         quiz: "",
-        imageUrl: "",
+        image: "",
         githubUrl: "",
         refUrls: [],
         wakatimeProjectIds: [],
       });
       setQuizOptions(["", "", "", ""]);
       setImageOpen(false);
+      setMentionQuery("");
+      setMentionStart(null);
+      setMentionEnd(null);
       onClose();
       if (state.returnTo) {
         navigate(state.returnTo);
@@ -456,13 +503,16 @@ function PostComposerModal({
       category: "devlog",
       projectId: "",
       quiz: "",
-      imageUrl: "",
+      image: "",
       githubUrl: "",
       refUrls: [],
       wakatimeProjectIds: [],
     });
     setQuizOptions(["", "", "", ""]);
     setImageOpen(false);
+    setMentionQuery("");
+    setMentionStart(null);
+    setMentionEnd(null);
     onClose();
     if (state.returnTo) {
       navigate(state.returnTo);
@@ -566,6 +616,70 @@ function PostComposerModal({
     setProjectPickerOpen(false);
   }
 
+  function updateMentionState(content: string, cursor: number) {
+    if (cursor < 0) {
+      setMentionQuery("");
+      setMentionStart(null);
+      setMentionEnd(null);
+      return;
+    }
+
+    const beforeCursor = content.slice(0, cursor);
+    const match = beforeCursor.match(/(?:^|\s)@\{?([a-zA-Z0-9_]*)$/);
+    if (!match) {
+      setMentionQuery("");
+      setMentionStart(null);
+      setMentionEnd(null);
+      return;
+    }
+
+    const atIndex = beforeCursor.lastIndexOf("@");
+    if (atIndex < 0) {
+      setMentionQuery("");
+      setMentionStart(null);
+      setMentionEnd(null);
+      return;
+    }
+
+    setMentionQuery(match[1] ?? "");
+    setMentionStart(atIndex);
+    setMentionEnd(cursor);
+  }
+
+  function applyMention(username: string) {
+    if (mentionStart === null || mentionEnd === null) {
+      return;
+    }
+
+    const current = form.getValues("content") ?? "";
+    const prefix = current.slice(0, mentionStart);
+    const suffix = current.slice(mentionEnd);
+    const token = `@${username} `;
+    const next = `${prefix}${token}${suffix}`;
+
+    form.setValue("content", next, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+
+    const nextCursor = prefix.length + token.length;
+    requestAnimationFrame(() => {
+      const element = contentInputRef.current;
+      if (!element) {
+        return;
+      }
+
+      element.focus();
+      element.setSelectionRange(nextCursor, nextCursor);
+    });
+
+    setMentionQuery("");
+    setMentionStart(null);
+    setMentionEnd(null);
+  }
+
+  const contentField = form.register("content");
+
   useEffect(() => {
     if (state.open) {
       setShouldRender(true);
@@ -597,7 +711,7 @@ function PostComposerModal({
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px] transition-opacity duration-200",
+        "fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px] transition-opacity duration-200 overflow-scroll",
         isClosing ? "opacity-0" : "opacity-100",
       )}
     >
@@ -628,27 +742,143 @@ function PostComposerModal({
             submitMutation.mutate(payload),
           )}
         >
-          <Textarea
-            id="content"
-            {...form.register("content")}
-            rows={6}
-            className={cn(
-              ["devlog", "ask"].includes(currentCategory) &&
-                "rounded-none rounded-t-md",
-            )}
-            placeholder="Write the update, thought, or question..."
-          />
+          <div className="relative">
+            <Textarea
+              id="content"
+              {...contentField}
+              ref={(element) => {
+                contentField.ref(element);
+                contentInputRef.current = element;
+              }}
+              rows={6}
+              className={cn(
+                ["devlog", "ask"].includes(currentCategory) &&
+                  "rounded-none rounded-t-md",
+              )}
+              placeholder="Write the update, thought, or question..."
+              onChange={(event) => {
+                contentField.onChange(event);
+                const cursor =
+                  event.target.selectionStart ?? event.target.value.length;
+                updateMentionState(event.target.value, cursor);
+              }}
+              onKeyUp={(event) => {
+                const target = event.currentTarget;
+                const cursor = target.selectionStart ?? target.value.length;
+                updateMentionState(target.value, cursor);
+              }}
+              onClick={(event) => {
+                const target = event.currentTarget;
+                const cursor = target.selectionStart ?? target.value.length;
+                updateMentionState(target.value, cursor);
+              }}
+              onKeyDown={(event) => {
+                if (!mentionOpen) {
+                  return;
+                }
+
+                if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  setMentionHighlightIndex((current) =>
+                    Math.min(current + 1, mentionSuggestions.length - 1),
+                  );
+                  return;
+                }
+
+                if (event.key === "ArrowUp") {
+                  event.preventDefault();
+                  setMentionHighlightIndex((current) =>
+                    Math.max(current - 1, 0),
+                  );
+                  return;
+                }
+
+                if (event.key === "Enter") {
+                  const selected = mentionSuggestions[mentionHighlightIndex];
+                  if (!selected) {
+                    return;
+                  }
+
+                  event.preventDefault();
+                  applyMention(selected.username);
+                  return;
+                }
+
+                if (event.key === "Escape") {
+                  setMentionQuery("");
+                  setMentionStart(null);
+                  setMentionEnd(null);
+                }
+              }}
+            />
+
+            {mentionOpen ? (
+              <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-44 overflow-y-auto rounded-md border border-border bg-background p-1 shadow-lg">
+                {mentionSuggestions.map((user, index) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left transition-colors",
+                      index === mentionHighlightIndex
+                        ? "bg-primary/10 text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      applyMention(user.username);
+                    }}
+                  >
+                    <Avatar className="size-6 border border-border">
+                      {user.image ? (
+                        <AvatarImage src={user.image} alt={user.username} />
+                      ) : (
+                        <AvatarFallback className="text-[10px]">
+                          {(user.name || user.username)
+                            .slice(0, 1)
+                            .toUpperCase()}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <span className="min-w-0 flex-1 leading-tight">
+                      <span className="block truncate text-xs font-medium text-foreground">
+                        @{user.username}
+                      </span>
+                      <span className="block truncate text-[11px] text-muted-foreground">
+                        {user.name}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           {form.formState.errors.content ? (
             <p className="text-xs text-destructive">
               {form.formState.errors.content.message}
             </p>
+          ) : null}
+          {imageOpen || values.image ? (
+            <section className="space-y-2 border border-border p-3">
+              <ImageUploadField
+                label="Post image"
+                purpose="post-image"
+                value={values.image ?? ""}
+                hint="Upload an image to include with this post."
+                onChange={(url) =>
+                  form.setValue("image", url, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+              />
+            </section>
           ) : null}
 
           {currentCategory === "devlog" ? (
             <section className="space-y-4 rounded-b-md border border-border bg-background/40 p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">Project link</p>
                   <p className="text-xs text-muted-foreground">
                     Attach the devlog to a project that already has WakaTime
                     ids.
@@ -673,9 +903,7 @@ function PostComposerModal({
                       onClick={() => form.setValue("projectId", "")}
                     >
                       {selectedProject.title}
-                      <span className="text-muted-foreground">
-                        ({selectedProject.wakatimeIds.length} sources)
-                      </span>
+
                       <X className="size-3" />
                     </button>
                   ) : null}
@@ -880,7 +1108,7 @@ function PostComposerModal({
             <div className="flex items-center gap-2">
               <Button
                 type="button"
-                variant={imageOpen || values.imageUrl ? "default" : "outline"}
+                variant={imageOpen || values.image ? "default" : "outline"}
                 size="icon-sm"
                 className="rounded-md"
                 onClick={() => setImageOpen((current) => !current)}
@@ -889,29 +1117,6 @@ function PostComposerModal({
               </Button>
             </div>
           </div>
-
-          {imageOpen || values.imageUrl ? (
-            <section className="space-y-2 rounded-md border border-border bg-background/40 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="imageUrl">Image attachment</Label>
-                {values.imageUrl ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => form.setValue("imageUrl", "")}
-                  >
-                    Clear
-                  </Button>
-                ) : null}
-              </div>
-              <Input
-                id="imageUrl"
-                {...form.register("imageUrl")}
-                placeholder="Paste image URL"
-              />
-            </section>
-          ) : null}
 
           <div className="flex items-center justify-end gap-3">
             <Button type="button" variant="ghost" onClick={close}>

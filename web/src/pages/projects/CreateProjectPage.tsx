@@ -9,6 +9,7 @@ import { X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,10 +77,10 @@ export default function CreateProjectPage() {
       title: "",
       summary: "",
       description: "",
-      logoUrl: "?",
+      logo: "",
       projectUrl: "",
       githubUrl: "",
-      imageUrl: "",
+      image: "",
       videoUrl: "",
       tags: [],
       wakatimeProjectIds: [],
@@ -121,7 +122,7 @@ export default function CreateProjectPage() {
 
     try {
       const projectUrl = formValues.projectUrl?.trim() || "";
-      const imageUrl = formValues.imageUrl?.trim() || "";
+      const imageUrl = formValues.image?.trim() || "";
       const videoUrl = formValues.videoUrl?.trim() || "";
 
       const payload = await apiFetch<{
@@ -133,7 +134,7 @@ export default function CreateProjectPage() {
           summary: formValues.summary.trim(),
           description: formValues.description.trim(),
           status: formValues.status,
-          logoUrl: formValues.logoUrl?.trim() || "?",
+          logoUrl: formValues.logo?.trim() || "?",
           projectUrl,
           imageUrl,
           videoUrl,
@@ -333,19 +334,18 @@ export default function CreateProjectPage() {
         <section className="space-y-4 border-b border-border pb-5">
           <p className="text-sm font-medium">Links and media</p>
 
-          <label className="block space-y-2">
-            <Label htmlFor="logoUrl">Logo URL *</Label>
-            <Input
-              id="logoUrl"
-              {...form.register("logoUrl")}
-              placeholder="https://cdn.example.com/logo.png"
-            />
-            {form.formState.errors.logoUrl ? (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.logoUrl.message}
-              </p>
-            ) : null}
-          </label>
+          <ImageUploadField
+            label="Project logo"
+            purpose="project-logo"
+            value={values.logo ?? ""}
+            hint="Upload a square logo for project cards and profile headers."
+            onChange={(url) =>
+              form.setValue("logo", url, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+          />
 
           <label className="block space-y-2">
             <Label htmlFor="projectUrl">Project URL</Label>
@@ -365,14 +365,18 @@ export default function CreateProjectPage() {
             />
           </label>
 
-          <label className="block space-y-2">
-            <Label htmlFor="imageUrl">Cover image URL</Label>
-            <Input
-              id="imageUrl"
-              {...form.register("imageUrl")}
-              placeholder="https://images.unsplash.com/..."
-            />
-          </label>
+          <ImageUploadField
+            label="Cover image"
+            purpose="project-image"
+            value={values.image ?? ""}
+            hint="Optional wide cover image for project detail pages."
+            onChange={(url) =>
+              form.setValue("image", url, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+          />
 
           <label className="block space-y-2">
             <Label htmlFor="videoUrl">Video URL</Label>

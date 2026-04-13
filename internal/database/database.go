@@ -32,5 +32,6 @@ func Migrate(db *gorm.DB) error {
 		&models.UserActivity{},
 		&models.PostQuizVote{},
 		&models.Notification{},
+		&models.ImageUpload{},
 	)
 }

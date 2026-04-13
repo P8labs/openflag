@@ -35,6 +35,7 @@ type User struct {
 
 	ContributedProjects []Project      `gorm:"many2many:project_collaborators;constraint:OnDelete:CASCADE;" json:"contributedProjects,omitempty"`
 	Notifications       []Notification `gorm:"foreignKey:UserID;references:ID" json:"notifications,omitempty"`
+	ImageUploads        []ImageUpload  `gorm:"foreignKey:UserID;references:ID" json:"imageUploads,omitempty"`
 }
 
 func (u *User) BeforeCreate(_ *gorm.DB) error {
@@ -229,6 +230,37 @@ type Notification struct {
 func (n *Notification) BeforeCreate(_ *gorm.DB) error {
 	if n.ID == "" {
 		n.ID = uuid.NewString()
+	}
+
+	return nil
+}
+
+type ImageUpload struct {
+	ID           string     `gorm:"primaryKey;size:36" json:"id"`
+	UserID       string     `gorm:"index;not null" json:"userId"`
+	Provider     string     `gorm:"type:text;not null;default:'cloudinary'" json:"provider"`
+	Purpose      string     `gorm:"index;type:text;not null" json:"purpose"`
+	PublicID     string     `gorm:"uniqueIndex;not null" json:"publicId"`
+	AssetID      string     `gorm:"index;type:text" json:"assetId"`
+	URL          string     `gorm:"type:text;not null" json:"url"`
+	SecureURL    string     `gorm:"type:text;not null" json:"secureUrl"`
+	ResourceType string     `gorm:"type:text;not null;default:'image'" json:"resourceType"`
+	Format       string     `gorm:"type:text" json:"format"`
+	Bytes        int64      `gorm:"not null;default:0" json:"bytes"`
+	Width        int        `gorm:"not null;default:0" json:"width"`
+	Height       int        `gorm:"not null;default:0" json:"height"`
+	IsActive     bool       `gorm:"index;not null;default:false" json:"isActive"`
+	ActivatedAt  *time.Time `gorm:"index" json:"activatedAt,omitempty"`
+	LastSeenAt   *time.Time `gorm:"index" json:"lastSeenAt,omitempty"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
+
+	User User `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE;" json:"user,omitempty"`
+}
+
+func (i *ImageUpload) BeforeCreate(_ *gorm.DB) error {
+	if i.ID == "" {
+		i.ID = uuid.NewString()
 	}
 
 	return nil

@@ -16,12 +16,17 @@ export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  const isFormDataBody =
+    typeof FormData !== "undefined" && init?.body instanceof FormData;
+
   const response = await fetch(apiUrl(path), {
     credentials: "include",
     ...init,
     headers: {
       ...(init?.headers ?? {}),
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.body && !isFormDataBody
+        ? { "Content-Type": "application/json" }
+        : {}),
     },
   });
 

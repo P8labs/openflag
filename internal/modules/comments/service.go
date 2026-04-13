@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"openflag/internal/models"
 
@@ -61,6 +62,10 @@ func (s *Service) Create(ctx context.Context, postID, userID string, input Creat
 	}
 
 	if err := s.repo.Create(ctx, comment); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.IncrementUserActivity(ctx, userID, time.Now()); err != nil {
 		return nil, err
 	}
 

@@ -33,6 +33,11 @@ type Service struct {
 	repo       *Repository
 	db         *gorm.DB
 	httpClient *http.Client
+	media      mediaUploadAccess
+}
+
+type mediaUploadAccess interface {
+	MarkImageActive(context.Context, string, string) error
 }
 
 type githubPullRequest struct {
@@ -50,22 +55,23 @@ type githubIssue struct {
 	} `json:"pull_request"`
 }
 
-func NewService(repo *Repository, db *gorm.DB) *Service {
+func NewService(repo *Repository, db *gorm.DB, media mediaUploadAccess) *Service {
 	return &Service{
 		repo:       repo,
 		db:         db,
 		httpClient: &http.Client{Timeout: 10 * time.Second},
+		media:      media,
 	}
 }
 
 func (s *Service) List(ctx context.Context, userID string, searchQuery string, limit int, offset int) ([]models.Project, bool, error) {
-	projects, hasMore, err := s.repo.List(ctx, searchQuery, limit, offset)
-	if err != nil {
-		return nil, false, err
+	if strings.TrimSpace(userID) == "" {
+		return []models.Project{}, false, nil
 	}
 
-	if userID == "" {
-		return projects, hasMore, nil
+	projects, hasMore, err := s.repo.List(ctx, userID, searchQuery, limit, offset)
+	if err != nil {
+		return nil, false, err
 	}
 
 	var account models.OAuthAccount
@@ -105,6 +111,15 @@ func (s *Service) List(ctx context.Context, userID string, searchQuery string, l
 	return projects, hasMore, nil
 }
 
+func (s *Service) GetForUser(ctx context.Context, id string, userID string) (*models.Project, error) {
+	project, err := s.repo.FindByIDForOwner(ctx, id, userID)
+	if err != nil {
+		return nil, mapProjectErr(err)
+	}
+
+	return project, nil
+}
+
 func (s *Service) Get(ctx context.Context, id string) (*models.Project, error) {
 	project, err := s.repo.FindByID(ctx, id)
 	if err != nil {
@@ -142,7 +157,20 @@ func (s *Service) Create(ctx context.Context, ownerID string, input CreateReques
 		Tags:        normalizeTags(input.Tags),
 	}
 
+	if s.media != nil {
+		if err := s.media.MarkImageActive(ctx, ownerID, strings.TrimSpace(input.LogoURL)); err != nil {
+			return nil, err
+		}
+		if err := s.media.MarkImageActive(ctx, ownerID, strings.TrimSpace(input.ImageURL)); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := s.repo.Create(ctx, project); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.IncrementUserActivity(ctx, ownerID, time.Now()); err != nil {
 		return nil, err
 	}
 
@@ -166,9 +194,27 @@ func (s *Service) Update(ctx context.Context, id string, ownerID string, input U
 	}
 	setNonEmptyTrimmed(updates, "description", input.Description)
 	if input.LogoURL != nil {
+		if s.media != nil {
+			if err := s.media.MarkImageActive(ctx, ownerID, strings.TrimSpace(*input.LogoURL)); err != nil {
+				return nil, err
+			}
+		}
 		updates["logo_url"] = normalizeLogoURL(*input.LogoURL)
 	}
 	setNullableTrimmed(updates, "url", input.ProjectURL)
+	if input.ImageURL != nil {
+		if s.media != nil {
+			if err := s.media.MarkImageActive(ctx, ownerID, strings.TrimSpace(*input.ImageURL)); err != nil {
+				return nil, err
+			}
+		}
+	} else if input.Image != nil {
+		if s.media != nil {
+			if err := s.media.MarkImageActive(ctx, ownerID, strings.TrimSpace(*input.Image)); err != nil {
+				return nil, err
+			}
+		}
+	}
 	setNullableTrimmed(updates, "image", firstProvided(input.ImageURL, input.Image))
 	setNullableTrimmed(updates, "video", firstProvided(input.VideoURL, input.Video))
 	setNullableTrimmed(updates, "github_url", input.GitHubURL)
@@ -208,6 +254,10 @@ func (s *Service) TrackedMinutes(ctx context.Context, id string, userID string) 
 	project, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, mapProjectErr(err)
+	}
+
+	if project.OwnerID != userID {
+		return nil, ErrProjectForbidden
 	}
 
 	loggedMinutes := 0

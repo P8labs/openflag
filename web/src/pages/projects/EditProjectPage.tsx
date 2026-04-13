@@ -9,6 +9,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -83,11 +84,11 @@ export default function EditProjectPage() {
       title: "",
       summary: "",
       description: "",
-      logoUrl: "?",
+      logo: "",
       status: "dev",
       projectUrl: "",
       githubUrl: "",
-      imageUrl: "",
+      image: "",
       videoUrl: "",
       tags: [],
       wakatimeProjectIds: [],
@@ -105,11 +106,11 @@ export default function EditProjectPage() {
       title: project.title,
       summary: project.summary,
       description: project.description,
-      logoUrl: project.logoUrl ?? "?",
+      logo: project.logoUrl ?? "",
       status: normalizeProjectStatus(project.status),
       projectUrl: project.url ?? "",
       githubUrl: project.githubUrl ?? "",
-      imageUrl: project.image ?? "",
+      image: project.image ?? "",
       videoUrl: project.video ?? "",
       tags: project.tags ?? [],
       wakatimeProjectIds: project.wakatimeIds ?? [],
@@ -139,9 +140,9 @@ export default function EditProjectPage() {
             summary: payload.summary.trim(),
             description: payload.description.trim(),
             status: payload.status,
-            logoUrl: payload.logoUrl?.trim() || "?",
+            logoUrl: payload.logo?.trim() || "?",
             projectUrl: payload.projectUrl?.trim() || "",
-            imageUrl: payload.imageUrl?.trim() || "",
+            imageUrl: payload.image?.trim() || "",
             videoUrl: payload.videoUrl?.trim() || "",
             githubUrl: payload.githubUrl?.trim() || "",
             wakatimeIds: payload.wakatimeProjectIds,
@@ -291,15 +292,18 @@ export default function EditProjectPage() {
         <section className="space-y-4 border-b border-border pb-5">
           <p className="text-sm font-medium">Links and media</p>
 
-          <label className="block space-y-2">
-            <Label htmlFor="logoUrl">Logo URL *</Label>
-            <Input id="logoUrl" {...form.register("logoUrl")} />
-            {form.formState.errors.logoUrl ? (
-              <p className="text-xs text-destructive">
-                {form.formState.errors.logoUrl.message}
-              </p>
-            ) : null}
-          </label>
+          <ImageUploadField
+            label="Project logo"
+            purpose="project-logo"
+            value={values.logo ?? ""}
+            hint="Upload a square logo for project cards and profile headers."
+            onChange={(url) =>
+              form.setValue("logo", url, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+          />
 
           <label className="block space-y-2">
             <Label htmlFor="projectUrl">Project URL</Label>
@@ -311,10 +315,18 @@ export default function EditProjectPage() {
             <Input id="githubUrl" {...form.register("githubUrl")} />
           </label>
 
-          <label className="block space-y-2">
-            <Label htmlFor="imageUrl">Cover image URL</Label>
-            <Input id="imageUrl" {...form.register("imageUrl")} />
-          </label>
+          <ImageUploadField
+            label="Cover image"
+            purpose="project-image"
+            value={values.image ?? ""}
+            hint="Optional wide cover image for project detail pages."
+            onChange={(url) =>
+              form.setValue("image", url, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+          />
 
           <label className="block space-y-2">
             <Label htmlFor="videoUrl">Video URL</Label>

@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { RichText } from "@/components/ui/rich-text";
 import {
   ProfileEditForm,
   type ProfileFormData,
@@ -297,7 +298,7 @@ export default function UserProfilePage() {
                   {new Date(post.createdAt).toLocaleDateString()}
                 </span>
               </div>
-              <p className="text-sm">{post.content}</p>
+              <RichText text={post.content} className="text-sm" />
             </li>
           ))}
         </ul>

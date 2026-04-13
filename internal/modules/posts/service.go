@@ -30,6 +30,7 @@ const (
 type Service struct {
 	repo          *Repository
 	projectAccess projectLookup
+	media         mediaUploadAccess
 	db            *gorm.DB
 }
 
@@ -38,8 +39,12 @@ type projectLookup interface {
 	TrackedMinutes(context.Context, string, string) (*projectsmodule.TrackedTimeResponse, error)
 }
 
-func NewService(repo *Repository, projectAccess projectLookup, db *gorm.DB) *Service {
-	return &Service{repo: repo, projectAccess: projectAccess, db: db}
+type mediaUploadAccess interface {
+	MarkImageActive(context.Context, string, string) error
+}
+
+func NewService(repo *Repository, projectAccess projectLookup, media mediaUploadAccess, db *gorm.DB) *Service {
+	return &Service{repo: repo, projectAccess: projectAccess, media: media, db: db}
 }
 
 func (s *Service) List(ctx context.Context, userID string, limit int, offset int) ([]models.Post, bool, error) {
@@ -130,6 +135,12 @@ func (s *Service) Create(ctx context.Context, authorID string, input CreateReque
 		WakatimeIDs:   input.WakatimeIDs,
 		ProjectID:     nil,
 	}
+
+	if s.media != nil && input.Image != nil {
+		if err := s.media.MarkImageActive(ctx, authorID, strings.TrimSpace(*input.Image)); err != nil {
+			return nil, err
+		}
+	}
 	if projectID != "" {
 		post.ProjectID = &projectID
 	}
@@ -172,6 +183,11 @@ func (s *Service) Update(ctx context.Context, id string, authorID string, input 
 		updates["quiz"] = normalizedOptionalStringPtr(input.Quiz)
 	}
 	if input.Image != nil {
+		if s.media != nil {
+			if err := s.media.MarkImageActive(ctx, authorID, strings.TrimSpace(*input.Image)); err != nil {
+				return nil, err
+			}
+		}
 		updates["image"] = strings.TrimSpace(*input.Image)
 	}
 	if input.GitHubURL != nil {

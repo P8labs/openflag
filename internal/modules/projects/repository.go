@@ -3,6 +3,7 @@ package projects
 import (
 	"context"
 	"strings"
+	"time"
 
 	"openflag/internal/models"
 
@@ -17,10 +18,11 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) List(ctx context.Context, searchQuery string, limit int, offset int) ([]models.Project, bool, error) {
+func (r *Repository) List(ctx context.Context, ownerID string, searchQuery string, limit int, offset int) ([]models.Project, bool, error) {
 	var projects []models.Project
 	query := r.db.WithContext(ctx).
 		Preload("Owner").
+		Where("owner_id = ?", ownerID).
 		Order("created_at desc")
 
 	normalizedQuery := strings.TrimSpace(strings.ToLower(searchQuery))
@@ -51,6 +53,20 @@ func (r *Repository) List(ctx context.Context, searchQuery string, limit int, of
 	return projects, hasMore, nil
 }
 
+func (r *Repository) FindByIDForOwner(ctx context.Context, id string, ownerID string) (*models.Project, error) {
+	var project models.Project
+	if err := r.db.WithContext(ctx).
+		Preload("Owner").
+		Preload("Collaborators").
+		Preload("Posts").
+		Preload("Posts.Author").
+		First(&project, "id = ? AND owner_id = ?", id, ownerID).Error; err != nil {
+		return nil, err
+	}
+
+	return &project, nil
+}
+
 func (r *Repository) FindByID(ctx context.Context, id string) (*models.Project, error) {
 	var project models.Project
 	if err := r.db.WithContext(ctx).
@@ -79,4 +95,26 @@ func (r *Repository) Update(ctx context.Context, id string, updates map[string]a
 
 func (r *Repository) Delete(ctx context.Context, id string) error {
 	return r.db.WithContext(ctx).Delete(&models.Project{}, "id = ?", id).Error
+}
+
+func (r *Repository) IncrementUserActivity(ctx context.Context, userID string, day time.Time) error {
+	activityDate := day.UTC().Truncate(24 * time.Hour)
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var activity models.UserActivity
+		err := tx.Where("user_id = ? AND activity_date = ?", userID, activityDate).First(&activity).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return tx.Create(&models.UserActivity{
+					UserID:       userID,
+					ActivityDate: activityDate,
+					Count:        1,
+				}).Error
+			}
+			return err
+		}
+
+		return tx.Model(&models.UserActivity{}).
+			Where("id = ?", activity.ID).
+			Update("count", gorm.Expr("count + 1")).Error
+	})
 }

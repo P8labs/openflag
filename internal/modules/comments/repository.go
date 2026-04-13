@@ -2,6 +2,7 @@ package comments
 
 import (
 	"context"
+	"time"
 
 	"openflag/internal/models"
 
@@ -54,4 +55,26 @@ func (r *Repository) Update(ctx context.Context, id string, updates map[string]a
 
 func (r *Repository) Delete(ctx context.Context, id string) error {
 	return r.db.WithContext(ctx).Delete(&models.PostComment{}, "id = ?", id).Error
+}
+
+func (r *Repository) IncrementUserActivity(ctx context.Context, userID string, day time.Time) error {
+	activityDate := day.UTC().Truncate(24 * time.Hour)
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var activity models.UserActivity
+		err := tx.Where("user_id = ? AND activity_date = ?", userID, activityDate).First(&activity).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return tx.Create(&models.UserActivity{
+					UserID:       userID,
+					ActivityDate: activityDate,
+					Count:        1,
+				}).Error
+			}
+			return err
+		}
+
+		return tx.Model(&models.UserActivity{}).
+			Where("id = ?", activity.ID).
+			Update("count", gorm.Expr("count + 1")).Error
+	})
 }

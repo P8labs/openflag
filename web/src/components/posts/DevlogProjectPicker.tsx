@@ -98,9 +98,6 @@ export function DevlogProjectPicker({
                         {project.summary}
                       </p>
                     </div>
-                    <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">
-                      {project.wakatimeIds.length} sources
-                    </span>
                   </div>
                 </button>
               );

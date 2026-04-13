@@ -39,6 +39,7 @@ export type FeedPost = {
   quizVotes?: Array<{ userId: string; optionIndex: number }>;
   myQuizVote?: { userId: string; optionIndex: number } | null;
   refUrls?: string[];
+  image?: string | null;
   devlogMinutes?: number;
   createdAt: string;
   authorId: string;
