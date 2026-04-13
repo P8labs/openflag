@@ -75,7 +75,9 @@ type CreatePostResponse = {
 };
 
 type TrackedTimeResponse = {
-  minutes: number;
+  totalMinutes: number;
+  loggedMinutes: number;
+  notLoggedMinutes: number;
 };
 
 type ProjectListItem = DevlogProject & {
@@ -928,7 +930,9 @@ function PostComposerModal({
                     <p className="text-xs text-muted-foreground">
                       This devlog will log{" "}
                       <span className="font-medium text-foreground">
-                        {formatDuration(trackedTimeQuery.data?.minutes ?? 0)}
+                        {formatDuration(
+                          trackedTimeQuery.data?.notLoggedMinutes ?? 0,
+                        )}
                       </span>{" "}
                       of tracked time.
                     </p>
