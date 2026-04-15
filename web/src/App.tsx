@@ -19,6 +19,7 @@ import {
 } from "./pages";
 
 import { AppShell } from "@/components/AppShell";
+import { GlobalActivityIndicator } from "@/components/ui/global-activity-indicator";
 import { AuthGate } from "@/context/auth-context";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import appConfig from "./lib/config";
@@ -35,6 +36,7 @@ export default function App() {
     <ThemeProvider>
       <BrowserRouter>
         <AuthGate>
+          <GlobalActivityIndicator />
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/policy" element={<PolicyPage />} />

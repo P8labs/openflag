@@ -47,11 +47,43 @@ export default function NotificationsPage() {
   });
 
   const readAllMutation = useMutation({
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["notifications"] });
+      const previous = queryClient.getQueryData<NotificationsResponse>([
+        "notifications",
+      ]);
+
+      queryClient.setQueryData<NotificationsResponse>(
+        ["notifications"],
+        (current) => {
+          if (!current) {
+            return current;
+          }
+
+          const now = new Date().toISOString();
+          return {
+            ...current,
+            unreadCount: 0,
+            notifications: current.notifications.map((item) => ({
+              ...item,
+              readAt: item.readAt ?? now,
+            })),
+          };
+        },
+      );
+
+      return { previous };
+    },
     mutationFn: () =>
       apiFetch<{ success: boolean }>("/api/v1/me/notifications/read-all", {
         method: "POST",
       }),
-    onSuccess: async () => {
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["notifications"], context.previous);
+      }
+    },
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: ["notifications"] });
       await queryClient.invalidateQueries({
         queryKey: ["notifications-unread-count"],

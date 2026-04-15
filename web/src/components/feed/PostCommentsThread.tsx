@@ -35,13 +35,50 @@ export function PostCommentsThread({
   }, [commentsQuery.data?.comments, onCountChange]);
 
   const commentMutation = useMutation({
+    onMutate: async (content: string) => {
+      await queryClient.cancelQueries({ queryKey: ["post-comments", postId] });
+      const previous = queryClient.getQueryData<{ comments: FeedComment[] }>([
+        "post-comments",
+        postId,
+      ]);
+
+      if (!user) {
+        return { previous };
+      }
+
+      const optimisticComment: FeedComment = {
+        id: `optimistic-${Date.now()}`,
+        content,
+        createdAt: new Date().toISOString(),
+        userId: user.id,
+        user: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+        },
+      };
+
+      queryClient.setQueryData<{ comments: FeedComment[] }>(
+        ["post-comments", postId],
+        (current) => ({
+          comments: [optimisticComment, ...(current?.comments ?? [])],
+        }),
+      );
+
+      setDraft("");
+      return { previous };
+    },
     mutationFn: (content: string) =>
       apiFetch<{ comment: FeedComment }>(`/api/v1/posts/${postId}/comments`, {
         method: "POST",
         body: JSON.stringify({ content }),
       }),
-    onSuccess: async () => {
-      setDraft("");
+    onError: (_error, _content, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["post-comments", postId], context.previous);
+      }
+    },
+    onSettled: async () => {
       await queryClient.invalidateQueries({
         queryKey: ["post-comments", postId],
       });

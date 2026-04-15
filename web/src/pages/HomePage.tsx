@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  type InfiniteData,
   useInfiniteQuery,
   useMutation,
   useQueryClient,
@@ -16,6 +17,12 @@ import { buttonVariants } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
+
+type HomePostsPage = {
+  posts: FeedPost[];
+  hasMore: boolean;
+  nextOffset: number;
+};
 
 export default function HomePage() {
   const HOME_POSTS_QUERY_KEY = ["home-feed", "posts"] as const;
@@ -168,6 +175,52 @@ export default function HomePage() {
   }, [deepLinkedPostID, feed.length]);
 
   const likeMutation = useMutation({
+    onMutate: async (postID: string) => {
+      await queryClient.cancelQueries({ queryKey: HOME_POSTS_QUERY_KEY });
+      const previous =
+        queryClient.getQueryData<InfiniteData<HomePostsPage>>(
+          HOME_POSTS_QUERY_KEY,
+        );
+
+      if (!user?.id) {
+        return { previous };
+      }
+
+      queryClient.setQueryData<InfiniteData<HomePostsPage>>(
+        HOME_POSTS_QUERY_KEY,
+        (current) => {
+          if (!current) {
+            return current;
+          }
+
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              posts: page.posts.map((post) => {
+                if (post.id !== postID) {
+                  return post;
+                }
+
+                const likes = post.likes ?? [];
+                const hasLiked = likes.some(
+                  (likedUser) => likedUser.id === user.id,
+                );
+
+                return {
+                  ...post,
+                  likes: hasLiked
+                    ? likes.filter((likedUser) => likedUser.id !== user.id)
+                    : [...likes, { id: user.id }],
+                };
+              }),
+            })),
+          };
+        },
+      );
+
+      return { previous };
+    },
     mutationFn: (postID: string) =>
       apiFetch<{ post: FeedPost; liked: boolean }>(
         `/api/v1/posts/${postID}/like`,
@@ -175,12 +228,66 @@ export default function HomePage() {
           method: "POST",
         },
       ),
-    onSuccess: async () => {
+    onError: (_error, _postID, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(HOME_POSTS_QUERY_KEY, context.previous);
+      }
+    },
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: HOME_POSTS_QUERY_KEY });
     },
   });
 
   const quizVoteMutation = useMutation({
+    onMutate: async ({
+      postID,
+      optionIndex,
+    }: {
+      postID: string;
+      optionIndex: number;
+    }) => {
+      await queryClient.cancelQueries({ queryKey: HOME_POSTS_QUERY_KEY });
+      const previous =
+        queryClient.getQueryData<InfiniteData<HomePostsPage>>(
+          HOME_POSTS_QUERY_KEY,
+        );
+
+      if (!user?.id) {
+        return { previous };
+      }
+
+      queryClient.setQueryData<InfiniteData<HomePostsPage>>(
+        HOME_POSTS_QUERY_KEY,
+        (current) => {
+          if (!current) {
+            return current;
+          }
+
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              posts: page.posts.map((post) => {
+                if (post.id !== postID || post.myQuizVote) {
+                  return post;
+                }
+
+                return {
+                  ...post,
+                  myQuizVote: { userId: user.id, optionIndex },
+                  quizVotes: [
+                    ...(post.quizVotes ?? []),
+                    { userId: user.id, optionIndex },
+                  ],
+                };
+              }),
+            })),
+          };
+        },
+      );
+
+      return { previous };
+    },
     mutationFn: ({
       postID,
       optionIndex,
@@ -192,21 +299,44 @@ export default function HomePage() {
         method: "POST",
         body: JSON.stringify({ optionIndex }),
       }),
-    onSuccess: async () => {
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(HOME_POSTS_QUERY_KEY, context.previous);
+      }
+    },
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: HOME_POSTS_QUERY_KEY });
     },
   });
 
   const starProjectMutation = useMutation({
-    mutationFn: (projectID: string) =>
-      apiFetch<{ starred: boolean }>(`/api/v1/projects/${projectID}/star`, {
-        method: "POST",
-      }),
-    onSuccess: (_data, projectID) => {
+    onMutate: async (projectID: string) => {
+      const previous = starredProjects[projectID];
       setStarredProjects((current) => ({
         ...current,
         [projectID]: true,
       }));
+
+      return { previous, projectID };
+    },
+    mutationFn: (projectID: string) =>
+      apiFetch<{ starred: boolean }>(`/api/v1/projects/${projectID}/star`, {
+        method: "POST",
+      }),
+    onError: (_error, _projectID, context) => {
+      if (!context) {
+        return;
+      }
+
+      setStarredProjects((current) => {
+        const next = { ...current };
+        if (context.previous === undefined) {
+          delete next[context.projectID];
+        } else {
+          next[context.projectID] = context.previous;
+        }
+        return next;
+      });
     },
   });
 
@@ -301,10 +431,16 @@ export default function HomePage() {
                   currentUserId={user?.id}
                   commentCount={commentCount}
                   commentPanelOpen={commentsOpen}
-                  likePending={likeMutation.isPending}
-                  quizPending={quizVoteMutation.isPending}
+                  likePending={
+                    likeMutation.isPending && likeMutation.variables === post.id
+                  }
+                  quizPending={
+                    quizVoteMutation.isPending &&
+                    quizVoteMutation.variables?.postID === post.id
+                  }
                   quizError={
-                    quizVoteMutation.isError
+                    quizVoteMutation.isError &&
+                    quizVoteMutation.variables?.postID === post.id
                       ? quizVoteMutation.error instanceof Error
                         ? quizVoteMutation.error.message
                         : "Unable to submit vote."

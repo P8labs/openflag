@@ -34,17 +34,18 @@ func (ctl *Controller) Login(c *gin.Context) {
 
 func (ctl *Controller) Callback(c *gin.Context) {
 	provider := c.Param("provider")
-	state := c.Query("state")
+	state := strings.TrimSpace(c.Query("state"))
 	code := c.Query("code")
-	stateCookie, err := c.Cookie("oauth_state")
+	stateCookie := cookieValue(c, "oauth_state")
 	mode := normalizeOAuthMode(cookieValue(c, "oauth_mode"))
-	if err != nil || state == "" || code == "" || stateCookie == "" || state != stateCookie {
+	if state == "" || code == "" || !stateInCookie(stateCookie, state) {
 		response.Fail(c, http.StatusBadRequest, "invalid oauth state")
 		return
 	}
+	ctl.setStateCookie(c, removeStateFromCookie(stateCookie, state))
+	defer ctl.clearModeCookie(c)
 
-	defer ctl.clearOAuthCookies(c)
-
+	var err error
 	currentUserID := ""
 	if mode == "connect" {
 		currentUserID, err = ctl.currentUserID(c)
@@ -307,7 +308,7 @@ func (ctl *Controller) setAuthCookie(c *gin.Context, token string) {
 }
 
 func (ctl *Controller) setStateCookie(c *gin.Context, state string) {
-	c.SetCookie("oauth_state", state, 300, "/", ctl.cookieDomain(), false, true)
+	c.SetCookie("oauth_state", mergeStateCookie(cookieValue(c, "oauth_state"), state), 300, "/", ctl.cookieDomain(), false, true)
 }
 
 func (ctl *Controller) setModeCookie(c *gin.Context, mode string) {
@@ -316,6 +317,10 @@ func (ctl *Controller) setModeCookie(c *gin.Context, mode string) {
 
 func (ctl *Controller) clearOAuthCookies(c *gin.Context) {
 	c.SetCookie("oauth_state", "", -1, "/", ctl.cookieDomain(), false, true)
+	c.SetCookie("oauth_mode", "", -1, "/", ctl.cookieDomain(), false, true)
+}
+
+func (ctl *Controller) clearModeCookie(c *gin.Context) {
 	c.SetCookie("oauth_mode", "", -1, "/", ctl.cookieDomain(), false, true)
 }
 
@@ -361,4 +366,74 @@ func normalizeOAuthMode(mode string) string {
 	}
 
 	return "login"
+}
+
+func splitStateCookie(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return []string{}
+	}
+
+	parts := strings.Split(raw, ",")
+	values := make([]string, 0, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		if value == "" {
+			continue
+		}
+		values = append(values, value)
+	}
+
+	return values
+}
+
+func stateInCookie(raw string, state string) bool {
+	for _, candidate := range splitStateCookie(raw) {
+		if candidate == state {
+			return true
+		}
+	}
+
+	return false
+}
+
+func mergeStateCookie(raw string, newState string) string {
+	newState = strings.TrimSpace(newState)
+	if newState == "" {
+		return raw
+	}
+
+	states := splitStateCookie(raw)
+	filtered := make([]string, 0, len(states)+1)
+	for _, state := range states {
+		if state == newState {
+			continue
+		}
+		filtered = append(filtered, state)
+	}
+
+	filtered = append(filtered, newState)
+	if len(filtered) > 8 {
+		filtered = filtered[len(filtered)-8:]
+	}
+
+	return strings.Join(filtered, ",")
+}
+
+func removeStateFromCookie(raw string, usedState string) string {
+	usedState = strings.TrimSpace(usedState)
+	if usedState == "" {
+		return raw
+	}
+
+	states := splitStateCookie(raw)
+	filtered := make([]string, 0, len(states))
+	for _, state := range states {
+		if state == usedState {
+			continue
+		}
+		filtered = append(filtered, state)
+	}
+
+	return strings.Join(filtered, ",")
 }
